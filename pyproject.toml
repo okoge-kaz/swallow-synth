@@ -1,0 +1,11 @@
+[project]
+name = "swallow-code-v2"
+version = "0.1.0"
+description = "Swallow Code v2"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ruff>=0.11.10",
+    "torch>=2.6.0",
+    "vllm>=0.8.5.post1",
+]
