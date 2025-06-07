@@ -1,11 +1,14 @@
 import ast
 import subprocess
 import json
+import tempfile
+import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
 from vllm import LLM, SamplingParams
 from src.static.style_rewriting_prompt import PYTHON_STYLE_REWRITING_PROMPT
+
 # === CPU Stage: Syntax check, fast format (ruff), lint (ruff) ===
 
 
@@ -17,13 +20,19 @@ def syntax_check(code: str) -> Tuple[bool, List[Dict[str, Any]]]:
         return False, [{"type": "syntax_error", "message": str(e), "line": e.lineno, "offset": e.offset}]
 
 
-def format_with_ruff(code: str, tmp_path: Path) -> Tuple[str, List[Dict[str, Any]]]:
-    # Write code to temp file
-    tmp_path.write_text(code, encoding="utf-8")
+def format_with_ruff(code: str, tmp_path: Optional[Path] = None) -> Tuple[str, List[Dict[str, Any]]]:
+    if tmp_path is None:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp_file:
+            tmp_file.write(code)
+            tmp_path = Path(tmp_file.name)
+    else:
+        tmp_path.write_text(code, encoding="utf-8")
+
     try:
         # Ruff auto-fix (formatter)
         subprocess.run(["ruff", "format", str(tmp_path)], check=True, capture_output=True, text=True)
-        return tmp_path.read_text(encoding="utf-8"), []
+        formatted_code = tmp_path.read_text(encoding="utf-8")
+        return formatted_code, []
     except subprocess.CalledProcessError as e:
         # if format failed, return original code and error
         print(f"Ruff format failed: {e.stderr}")
@@ -32,33 +41,40 @@ def format_with_ruff(code: str, tmp_path: Path) -> Tuple[str, List[Dict[str, Any
         # if other error (file I/O, etc.), return original code
         print(f"Unexpected error during formatting: {str(e)}")
         return code, []
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
-def lint_with_ruff(code: str, tmp_path: Path) -> str:
-    tmp_path.write_text(code, encoding="utf-8")
-    # Ruff lint JSON output
-    proc = subprocess.run(
-        ["ruff", "--quiet", "--format=json", str(tmp_path)], capture_output=True, text=True, check=False
-    )
-    return proc.stdout
+def lint_with_ruff(code: str, tmp_path: Optional[Path] = None) -> str:
+    if tmp_path is None:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp_file:
+            tmp_file.write(code)
+            tmp_path = Path(tmp_file.name)
+    else:
+        tmp_path.write_text(code, encoding="utf-8")
+
+    try:
+        # Ruff lint JSON output
+        proc = subprocess.run(
+            ["ruff", "--quiet", "--format=json", str(tmp_path)], capture_output=True, text=True, check=False
+        )
+        return proc.stdout
+    except Exception as e:
+        print(f"Unexpected error during linting: {str(e)}")
+        return ""
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def process_item_cpu(item: Dict[str, Any], key: str = "text") -> Dict[str, Any]:
     code: str = item.get(key, "")
-    # 1) Fast format (includes syntax check)
-    formatted, format_errors = format_with_ruff(code, Path("tmp_code.py"))
+    unique_path = Path(f"tmp_code_{uuid.uuid4().hex[:8]}.py")
+
+    # format (includes syntax check)
+    formatted, format_errors = format_with_ruff(code, unique_path)
     item["text_formatted"] = formatted
-    # 2) Lint
-    lint_report: str = lint_with_ruff(formatted, Path("tmp_code.py"))
+    item["lint_report"] = format_errors
 
-    # Add format errors to lint report
-    if format_errors:
-        # Convert existing lint report to list if it's not empty
-        lint_list = json.loads(lint_report) if lint_report else []
-        lint_list.extend(format_errors)
-        lint_report = json.dumps(lint_list)
-
-    item["lint_report"] = lint_report
     return item
 
 
@@ -75,15 +91,65 @@ class RewritePipeline:
             max_model_len=131072,
         )
 
-    def generate(self, prompt: str) -> str:
+    def generate(self, prompts: list[str]) -> list[str]:
         # Greedy / deterministic inference
         params = SamplingParams(temperature=0)
-        output = self.llm.generate(prompt, params)[0]
-        return output.text  # type: ignore
+        outputs = self.llm.generate(prompts, params)
+        return [output.text for output in outputs]  # type: ignore
 
-    def rewrite_style(self, code: str, lint_report: str) -> str:
-        prompt = PYTHON_STYLE_REWRITING_PROMPT.format(lint_report=lint_report, code=code)
-        return self.generate(prompt)
+    def rewrite_style(self, codes: list[str], lint_reports: list[str]) -> list[str]:
+        # Construct chat templates for batch processing
+        prompts: list[str] = []
+        for code, lint_report in zip(codes, lint_reports):
+            prompt = (
+                "<|im_start|>system\n"
+                "You are a code improvement assistant. Your task is to improve the given code based on the linting warnings and best practices.\n"
+                "<|im_end|>\n"
+                "<|im_start|>user\n"
+                f"{PYTHON_STYLE_REWRITING_PROMPT.format(lint_report=lint_report, code=code)}\n"
+                "<|im_end|>\n"
+                "<|im_start|>assistant\n"
+            )
+            prompts.append(prompt)
+
+        # Batch generate
+        return self.generate(prompts)
+
+    def format_code(self, code: str) -> Tuple[str, List[Dict[str, Any]]]:
+        """Format a single code and return formatted code and any errors."""
+        unique_path = Path(f"tmp_code_{uuid.uuid4().hex[:8]}.py")
+        return format_with_ruff(code, unique_path)
+
+    def process_batch(self, items: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+        """Process a batch of items through the pipeline."""
+        # Extract formatted codes and lint reports
+        formatted_codes = []
+        lint_reports = []
+        for item in items:
+            formatted, _ = item.get("formatted", ("", []))
+            formatted_codes.append(formatted)
+            lint_report = item.get("lint_report", "")
+            lint_reports.append(lint_report)
+
+        # Filter and prioritize warnings for each item
+        filtered_lint_reports = []
+        for lint_report in lint_reports:
+            lint_list = json.loads(lint_report) if lint_report else []
+            filtered_lint_list = self.filter_and_prioritize_warnings(lint_list)
+            filtered_lint_reports.append(json.dumps(filtered_lint_list))
+
+        # Batch rewrite all codes
+        rewritten_codes = self.rewrite_style(formatted_codes, filtered_lint_reports)
+
+        # Update items with rewritten codes
+        for item, rewritten in zip(items, rewritten_codes):
+            item["rewritten_text"] = rewritten
+
+        return items
+
+    def process_item_gpu(self, items: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
+        """Process items through GPU pipeline."""
+        return self.process_batch(items)
 
     def post_check(self, code: str) -> Tuple[bool, List[Dict[str, Any]]]:
         return syntax_check(code)
@@ -202,31 +268,3 @@ class RewritePipeline:
             )
 
         return filtered_warnings
-
-    def process_item_gpu(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        formatted, _ = item.get("formatted", ("", []))
-        lint_report = item.get("lint_report", "")
-
-        # Filter and prioritize warnings
-        lint_list = json.loads(lint_report) if lint_report else []
-        filtered_lint_list = self.filter_and_prioritize_warnings(lint_list)
-        filtered_lint_report = json.dumps(filtered_lint_list)
-
-        # Single rewrite step that combines style and self-contained improvements
-        rewritten = self.rewrite_style(formatted, filtered_lint_report)
-
-        # Apply ruff format after rewriting
-        rewritten, format_errors = format_with_ruff(rewritten, Path("tmp_code.py"))
-
-        # Add format errors to lint report if any
-        if format_errors:
-            lint_list = json.loads(filtered_lint_report) if filtered_lint_report else []
-            lint_list.extend(format_errors)
-            filtered_lint_report = json.dumps(lint_list)
-            # Try one more rewrite with error information
-            rewritten = self.rewrite_style(rewritten, filtered_lint_report)
-            # Apply ruff format again after the second rewrite
-            rewritten, _ = format_with_ruff(rewritten, Path("tmp_code.py"))
-
-        item.update({"rewritten_text": rewritten})
-        return item
