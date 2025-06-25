@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
 from vllm import LLM, SamplingParams
+from transformers import AutoTokenizer
 from src.static.style_rewriting_prompt import PYTHON_STYLE_REWRITING_PROMPT
+from src.prompts.python.stage2 import PYTHON_STAGE2_PROMPT
+from src.languages.abc import RewritePipeline
 
 # === CPU Stage: Syntax check, fast format (ruff), lint (ruff) ===
 
@@ -81,21 +84,53 @@ def process_item_cpu(item: Dict[str, Any], key: str = "text") -> Dict[str, Any]:
 # === GPU Stage: Style & Self-contained rewriting via local LLM (vLLM) + post-check ===
 
 
-class RewritePipeline:
-    def __init__(self, model_name: str = "qwen-3", tensor_parallel_size: int = 1):  # adjust model path
-        # Load local Qwen model on GPU
+class PythonRewritePipeline(RewritePipeline):
+    def __init__(self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960) -> None:
+        self.model_name = model_name
+        self.tensor_parallel_size = tensor_parallel_size
+        self.max_model_len = max_model_len
+
         self.llm = LLM(
             model=model_name,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=0.95,
-            max_model_len=131072,
+            max_model_len=max_model_len,
         )
+
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def generate(self, prompts: list[str]) -> list[str]:
         # Greedy / deterministic inference
         params = SamplingParams(temperature=0)
         outputs = self.llm.generate(prompts, params)
         return [output.text for output in outputs]  # type: ignore
+
+    def fix_errors(self, codes: list[str], lint_reports: list[str]) -> list[str]:
+        # Construct chat templates for batch processing
+        prompts: list[str] = []
+        for code, lint_report in zip(codes, lint_reports):
+            prompt: str = PYTHON_STAGE2_PROMPT.format(
+                lint_report=lint_report,
+                code=code,
+            )
+            prompts.append(prompt)
+        tokenized_prompts_len = [len(self.tokenizer.encode(prompt)) for prompt in prompts]
+        max_len = max(tokenized_prompts_len)
+        if max_len >= self.max_model_len:
+            raise ValueError(
+                f"Prompt length exceeds model limit: {max_len} >= {self.max_model_len}. "
+                "Consider reducing the input size or using a smaller model."
+            )
+
+        return [
+            output.outputs[0].text
+            for output in self.llm.generate(
+                prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len)
+            )
+        ]
+
+    def add_scores(self, codes: list[str]) -> list[str]:
+        pass
 
     def rewrite_style(self, codes: list[str], lint_reports: list[str]) -> list[str]:
         # Construct chat templates for batch processing
@@ -114,11 +149,6 @@ class RewritePipeline:
 
         # Batch generate
         return self.generate(prompts)
-
-    def format_code(self, code: str) -> Tuple[str, List[Dict[str, Any]]]:
-        """Format a single code and return formatted code and any errors."""
-        unique_path = Path(f"tmp_code_{uuid.uuid4().hex[:8]}.py")
-        return format_with_ruff(code, unique_path)
 
     def process_batch(self, items: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
         """Process a batch of items through the pipeline."""
@@ -150,9 +180,6 @@ class RewritePipeline:
     def process_item_gpu(self, items: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
         """Process items through GPU pipeline."""
         return self.process_batch(items)
-
-    def post_check(self, code: str) -> Tuple[bool, List[Dict[str, Any]]]:
-        return syntax_check(code)
 
     def filter_and_prioritize_warnings(self, lint_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Filter and prioritize warnings to reduce noise and focus on important issues."""

@@ -4,12 +4,12 @@ from pathlib import Path
 from multiprocessing import Pool, cpu_count
 from typing import Callable, Any, Iterator
 import tempfile
-import os
 
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
-    RewritePipeline as PythonRewritePipeline,
+    PythonRewritePipeline,
 )
+from src.languages.abc import RewritePipeline
 
 
 def get_process_item_cpu(lang: str) -> Callable:
@@ -21,13 +21,15 @@ def get_process_item_cpu(lang: str) -> Callable:
     return processors[lang]
 
 
-def get_rewrite_pipeline(lang: str, model_name: str, batch_size: int, tensor_parallel_size: int = 1):
+def get_rewrite_pipeline(
+    lang: str, model_name: str, tensor_parallel_size: int = 1, model_max_length: int = 131072
+) -> RewritePipeline:
     pipelines = {
         "python": PythonRewritePipeline,
     }
     if lang not in pipelines:
         raise ValueError(f"Unsupported language: {lang}")
-    return pipelines[lang](model_name, tensor_parallel_size)
+    return pipelines[lang](model_name, tensor_parallel_size, model_max_length)
 
 
 def process_chunk_to_file(args):
@@ -98,8 +100,15 @@ def split_into_chunks(items: list, n_workers: int) -> list[list]:
     return [chunk for chunk in chunks if chunk]  # Remove empty chunks
 
 
-def preprocess(input_path: Path, output_path: Path, lang: str, n_workers: int = 16, batch_size: int = 1000) -> None:
-    """CPU only processing stage with separate files per worker"""
+def auto_format(
+    input_path: Path,
+    output_path: Path,
+    lang: str,
+    target_key: str = "text",
+    n_workers: int = 16,
+    batch_size: int = 1000,
+) -> None:
+    """Auto-format code in the specified key using CPU processing"""
     n_workers = n_workers or cpu_count()
     process_item_cpu = get_process_item_cpu(lang)
 
@@ -111,7 +120,7 @@ def preprocess(input_path: Path, output_path: Path, lang: str, n_workers: int = 
         start_time = time.time()
         temp_files = []
 
-        print(f"Starting CPU processing with {n_workers} workers...")
+        print(f"Starting auto-format processing with {n_workers} workers on key '{target_key}'...")
 
         with Pool(n_workers) as pool:
             # Process all batches
@@ -146,10 +155,239 @@ def preprocess(input_path: Path, output_path: Path, lang: str, n_workers: int = 
         merge_temp_files(temp_files, output_path)
 
         actual_time = time.time() - start_time
-        print(f"CPU processing completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
+        print(f"Auto-format processing completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
-def rewrite(
+def llm_rewrite(
+    input_path: Path,
+    output_path: Path,
+    lang: str,
+    model_name: str = "qwen-3",
+    batch_size: int = 32,
+    tensor_parallel_size: int = 1,
+    model_max_length: int = 40960,
+) -> None:
+    """LLM-based code rewriting using GPU processing"""
+    pipeline = get_rewrite_pipeline(
+        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+    )
+
+    total_items = 0
+    pass
+
+
+def have_linter_errors(item: dict) -> bool:
+    """Check if the item has linter errors."""
+    return len(item.get("lint_report", [])) > 0 if "lint_report" in item else False
+
+
+def separate_code_samples(input_path: Path, output_path: Path) -> None:
+    """Separate code samples from a JSONL file into two categories: with linter errors and without linter errors."""
+    with_errors_path = output_path / "with_errors.jsonl"
+
+
+def llm_auto_fix(
+    input_path: Path,
+    output_dir: Path,
+    lang: str,
+    model_name: str = "qwen-3",
+    batch_size: int = 32,
+    tensor_parallel_size: int = 1,
+    model_max_length: int = 40960,
+) -> None:
+    import re
+
+    pipeline = get_rewrite_pipeline(
+        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+    )
+
+    # Extract file number from input_path (e.g., train_0004.jsonl -> 0004)
+    file_number_match = re.search(r"(\d+)", input_path.name)
+    if not file_number_match:
+        raise ValueError(f"Cannot extract file number from {input_path.name}")
+    file_number = file_number_match.group(1).zfill(4)
+
+    # Create temporary files
+    tmp_without_errors_path = output_dir / f"tmp_{file_number}_without_errors.jsonl"
+    tmp_with_errors_path = output_dir / f"tmp_{file_number}_with_errors.jsonl"
+    stats_path = output_dir / f"{file_number}.out"
+
+    # Load data and separate with/without errors
+    with_errors_data = []
+    without_errors_data = []
+
+    print(f"Reading input file: {input_path}")
+    with input_path.open("r", encoding="utf-8") as fin:
+        for line in fin:
+            item = json.loads(line)
+            if have_linter_errors(item):
+                with_errors_data.append(item)
+            else:
+                without_errors_data.append(item)
+
+    # Write temporary files
+    with tmp_without_errors_path.open("w", encoding="utf-8") as fout:
+        for item in without_errors_data:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    with tmp_with_errors_path.open("w", encoding="utf-8") as fout:
+        for item in with_errors_data:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    # Write initial statistics
+    with stats_path.open("w", encoding="utf-8") as fout:
+        fout.write(f"Initial statistics:\n")
+        fout.write(f"Total items: {len(with_errors_data) + len(without_errors_data)}\n")
+        fout.write(f"Without errors: {len(without_errors_data)}\n")
+        fout.write(f"With errors: {len(with_errors_data)}\n\n")
+
+    print(f"Separated {len(with_errors_data)} items with errors and {len(without_errors_data)} items without errors")
+
+    # Process with_errors data
+    if with_errors_data:
+        # Filter by character count
+        filtered_data = []
+        skipped_count = 0
+
+        for item in with_errors_data:
+            text = item.get("text", "")
+            if len(text) >= model_max_length:
+                skipped_count += 1
+                continue
+            filtered_data.append(item)
+
+        print(f"Filtered data: {len(filtered_data)} items to process, {skipped_count} items skipped due to length")
+
+        # Process in batches
+        fixed_data = []
+        if filtered_data:
+            print("Starting error fixing process...")
+
+            for i in range(0, len(filtered_data), batch_size):
+                batch = filtered_data[i : i + batch_size]
+                print(f"Processing batch {i // batch_size + 1}/{(len(filtered_data) + batch_size - 1) // batch_size}")
+
+                # Prepare codes and lint_reports for fix_errors
+                codes = []
+                lint_reports = []
+
+                for item in batch:
+                    codes.append(item.get("text", ""))
+                    lint_report = item.get("lint_report", [])
+                    if isinstance(lint_report, list):
+                        lint_reports.append(json.dumps(lint_report))
+                    else:
+                        lint_reports.append(str(lint_report))
+
+                # Call pipeline.fix_errors
+                try:
+                    fixed_codes = pipeline.fix_errors(codes, lint_reports)
+
+                    # Extract code from markdown code blocks if present
+                    def extract_code_from_markdown(text: str, lang: str) -> str:
+                        code_block_marker = f"```{lang}"
+
+                        if code_block_marker in text:
+                            # Find the first ```{lang} block
+                            start_marker = code_block_marker
+                            end_marker = "```"
+
+                            start_idx = text.find(start_marker)
+                            if start_idx != -1:
+                                # Move past the start marker and any newline
+                                code_start = start_idx + len(start_marker)
+                                if code_start < len(text) and text[code_start] == "\n":
+                                    code_start += 1
+
+                                # Find the closing ```
+                                end_idx = text.find(end_marker, code_start)
+                                if end_idx != -1:
+                                    return text[code_start:end_idx].strip()
+
+                        # If no code block found, return original text
+                        return text
+
+                    # Update items with fixed codes
+                    for j, fixed_code in enumerate(fixed_codes):
+                        extracted_code = extract_code_from_markdown(fixed_code, lang)
+                        batch[j]["auto_fix_output"] = extracted_code  # Store extracted code
+                        batch[j]["text"] = extracted_code  # Store extracted code
+
+                    fixed_data.extend(batch)
+
+                except Exception as e:
+                    print(f"Error processing batch: {e}")
+                    # Keep original data if fixing fails
+                    fixed_data.extend(batch)
+
+            print("[INFO]: Error fixing completed")
+
+        # Re-run auto_format on fixed data
+        if fixed_data:
+            print("Re-running auto_format on fixed data...")
+
+            # Create temporary file for fixed data
+            temp_fixed_path = output_dir / f"temp_fixed_{file_number}.jsonl"
+            with temp_fixed_path.open("w", encoding="utf-8") as fout:
+                for item in fixed_data:
+                    fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+            # Run auto_format
+            temp_reformatted_path = output_dir / f"temp_reformatted_{file_number}.jsonl"
+            auto_format(temp_fixed_path, temp_reformatted_path, lang)
+
+            # Categorize results
+            still_with_errors = []
+            newly_fixed = []
+
+            with temp_reformatted_path.open("r", encoding="utf-8") as fin:
+                for line in fin:
+                    item = json.loads(line)
+                    if have_linter_errors(item):
+                        still_with_errors.append(item)
+                    else:
+                        newly_fixed.append(item)
+
+            # Update tmp_with_errors.jsonl with items that still have errors
+            with tmp_with_errors_path.open("w", encoding="utf-8") as fout:
+                for item in still_with_errors:
+                    fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+            # Merge newly fixed items with tmp_without_errors.jsonl
+            final_without_errors_path = output_dir / f"train_{file_number}_without_errors.jsonl"
+            with final_without_errors_path.open("w", encoding="utf-8") as fout:
+                # Write original without_errors_data with auto_fix_output key
+                for item in without_errors_data:
+                    item["auto_fix_output"] = ""  # Add empty auto_fix_output for consistency
+                    fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+                # Write newly fixed data
+                for item in newly_fixed:
+                    fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+            # Update statistics
+            with stats_path.open("a", encoding="utf-8") as fout:
+                fout.write(f"After error fixing:\n")
+                fout.write(f"Items processed for fixing: {len(filtered_data)}\n")
+                fout.write(f"Items skipped due to length: {skipped_count}\n")
+                fout.write(f"Successfully fixed: {len(newly_fixed)}\n")
+                fout.write(f"Still with errors: {len(still_with_errors)}\n")
+                fout.write(f"Final without errors: {len(without_errors_data) + len(newly_fixed)}\n")
+
+            # Clean up temporary files
+            temp_fixed_path.unlink(missing_ok=True)
+            temp_reformatted_path.unlink(missing_ok=True)
+
+            print(f"Completed: {len(newly_fixed)} items fixed, {len(still_with_errors)} items still have errors")
+            print(f"Final results saved to: {final_without_errors_path}")
+            print(f"Statistics saved to: {stats_path}")
+
+        else:
+            print("No data to process after filtering")
+    else:
+        print("No items with errors found")
+
+
+def llm_scoring(
     input_path: Path,
     output_path: Path,
     lang: str,
@@ -157,106 +395,12 @@ def rewrite(
     batch_size: int = 32,
     tensor_parallel_size: int = 1,
 ) -> None:
-    """GPU only processing stage"""
-    pipeline = get_rewrite_pipeline(lang, model_name, batch_size, tensor_parallel_size)
-
-    total_items = 0
-    start_time = time.time()
-
-    # Process in chunks to manage memory
-    chunk_size = 1000  # Process 1000 items at a time
-    current_chunk = []
-
-    with output_path.open("w", encoding="utf-8", buffering=1024 * 1024) as fout:  # 1MB buffer
-        for batch in stream_jsonl(input_path, batch_size):
-            total_items += len(batch)
-            results = pipeline.process_batch(batch)
-
-            # Mark as rewritten but not formatted
-            for result in results:
-                result["status"] = "rewritten"
-
-            current_chunk.extend(results)
-
-            # Write intermediate results when chunk is full
-            if len(current_chunk) >= chunk_size:
-                for result in current_chunk:
-                    fout.write(json.dumps(result, ensure_ascii=False) + "\n")
-                fout.flush()  # Flush only when chunk is full
-                current_chunk = []
-
-        # Write remaining results
-        if current_chunk:
-            for result in current_chunk:
-                fout.write(json.dumps(result, ensure_ascii=False) + "\n")
-            fout.flush()
-
-    # Process formatting in chunks
-    formatted_chunks = []
-
-    with input_path.open("r", encoding="utf-8") as fin:
-        current_chunk = []
-        for line in fin:
-            result = json.loads(line)
-            if result["status"] == "rewritten":
-                current_chunk.append(result)
-                if len(current_chunk) >= chunk_size:
-                    # Format chunk
-                    formatted_results = []
-                    format_errors = []
-                    for item in current_chunk:
-                        formatted, errors = pipeline.format_code(item["rewritten_text"])
-                        formatted_results.append(formatted)
-                        format_errors.append(errors)
-                    formatted_chunks.append((current_chunk, formatted_results, format_errors))
-                    current_chunk = []
-
-        # Process remaining items
-        if current_chunk:
-            formatted_results = []
-            format_errors = []
-            for item in current_chunk:
-                formatted, errors = pipeline.format_code(item["rewritten_text"])
-                formatted_results.append(formatted)
-                format_errors.append(errors)
-            formatted_chunks.append((current_chunk, formatted_results, format_errors))
-
-    # Process second rewrite if needed
-    needs_second_rewrite = []
-    second_rewrite_indices = []
-
-    for chunk, formatted_results, format_errors in formatted_chunks:
-        for i, errors in enumerate(format_errors):
-            if errors:
-                needs_second_rewrite.append({"text": formatted_results[i], "lint_report": json.dumps(errors)})
-                second_rewrite_indices.append((chunk, i))
-
-    # Perform second rewrite only for items with errors
-    if needs_second_rewrite:
-        second_rewritten = []
-        for i in range(0, len(needs_second_rewrite), batch_size):
-            batch = needs_second_rewrite[i : i + batch_size]
-            results = pipeline.process_batch(batch)
-            second_rewritten.extend(results)
-
-        # Format only the second rewritten items
-        for (chunk, idx), rewritten in zip(second_rewrite_indices, second_rewritten):
-            final_code, final_errors = pipeline.format_code(rewritten["rewritten_text"])
-            chunk[idx]["rewritten_text"] = final_code
-            if final_errors:
-                chunk[idx]["format_errors"] = final_errors
-
-    # Write final results
-    with output_path.open("w", encoding="utf-8", buffering=1024 * 1024) as fout:
-        for chunk, formatted_results, _ in formatted_chunks:
-            for item, formatted in zip(chunk, formatted_results):
-                item["rewritten_text"] = formatted
-                item["status"] = "formatted"
-                fout.write(json.dumps(item, ensure_ascii=False) + "\n")
-            fout.flush()  # Flush after each chunk
-
-    actual_time = time.time() - start_time
-    print(f"GPU processing time: {actual_time:.1f}s (1 item: {actual_time / total_items:.3f}s)")
+    """LLM-based code quality scoring"""
+    # TODO: Implement LLM scoring functionality
+    print("LLM scoring functionality not yet implemented")
+    # 1. Load the input JSONL file
+    # 2. Use the LLM to score the code samples
+    pass
 
 
 # === CLI Entrypoint ===
@@ -267,32 +411,66 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Code Quality Pipeline")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p1 = sub.add_parser("cpu", help="CPU only processing stage")
+    # Auto-format subcommand
+    p1 = sub.add_parser("auto_format", help="Auto-format code using CPU processing")
     p1.add_argument("--input-jsonl", type=Path, required=True)
     p1.add_argument("--output-jsonl", type=Path, required=True)
     p1.add_argument("--workers", type=int, default=32, help="Number of CPU workers")
     p1.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p1.add_argument("--batch-size", type=int, default=1000, help="Batch size for CPU processing")
+    p1.add_argument("--target-key", type=str, default="text", help="Key in JSON object to format (default: text)")
 
-    p2 = sub.add_parser("gpu", help="GPU only processing stage")
+    # LLM rewrite subcommand
+    p2 = sub.add_parser("llm_rewrite", help="LLM-based code rewriting using GPU processing")
     p2.add_argument("--input-jsonl", type=Path, required=True)
-    p2.add_argument("--output-jsonl", type=Path, required=True)
+    p2.add_argument("--output-dir", type=Path, required=True)
     p2.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
     p2.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p2.add_argument("--batch-size", type=int, default=32, help="Batch size for GPU processing")
     p2.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
 
+    # LLM auto-fix subcommand
+    p3 = sub.add_parser("llm_auto_fix", help="LLM-based automatic bug fixing")
+    p3.add_argument("--input-jsonl", type=Path, required=True)
+    p3.add_argument("--output-dir", type=Path, required=True)
+    p3.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
+    p3.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
+    p3.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
+    p3.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p3.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length")
+
+    # LLM scoring subcommand
+    p4 = sub.add_parser("llm_scoring", help="LLM-based code quality scoring")
+    p4.add_argument("--input-jsonl", type=Path, required=True)
+    p4.add_argument("--output-jsonl", type=Path, required=True)
+    p4.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
+    p4.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
+    p4.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
+    p4.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+
     args = parser.parse_args()
-    if args.cmd == "cpu":
-        preprocess(
+
+    if args.cmd == "auto_format":
+        auto_format(
             input_path=args.input_jsonl,
             output_path=args.output_jsonl,
             n_workers=args.workers,
             lang=args.lang,
             batch_size=args.batch_size,
+            target_key=args.target_key,
         )
-    elif args.cmd == "gpu":
-        rewrite(
+    elif args.cmd == "llm_auto_fix":
+        llm_auto_fix(
+            input_path=args.input_jsonl,
+            output_dir=args.output_dir,
+            model_name=args.model,
+            lang=args.lang,
+            batch_size=args.batch_size,
+            tensor_parallel_size=args.tensor_parallel_size,
+            model_max_length=args.model_max_length,
+        )
+    elif args.cmd == "llm_scoring":
+        llm_scoring(
             input_path=args.input_jsonl,
             output_path=args.output_jsonl,
             model_name=args.model,
