@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -q rt_HC
-#PBS -N llama-3.1-8b
+#PBS -N dataset
 #PBS -l select=1:ncpus=32
 #PBS -l walltime=24:00:00
 #PBS -j oe
@@ -18,10 +18,8 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-PROGRAMMING_LANGUAGE="Python"
-
-PARQUET_FILE_DIR="/groups/gag51395/datasets/raw/pretrain/the-stack-v2/the-stack-v2/data/${PROGRAMMING_LANGUAGE}"
-JSONL_FILE_DIR="/groups/gag51395/datasets/raw/pretrain/the-stack-v2-jsonl/${PROGRAMMING_LANGUAGE}"
+PARQUET_FILE_DIR="/groups/gag51395/datasets/instruct/OpenCodeReasoning/split_1"
+JSONL_FILE_DIR="$PARQUET_FILE_DIR-jsonl"
 mkdir -p "${JSONL_FILE_DIR}"
 
 # Convert Parquet files to JSONL
