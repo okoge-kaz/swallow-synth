@@ -23,13 +23,13 @@ fi
 # Submit jobs for each index
 for i in $(seq $START_INDEX $END_INDEX); do
     echo "Submitting job for INDEX=$i"
-    
+
     # Submit job and capture job ID
     JOB_ID=$(qsub -P gag51395 -v INDEX=$i $SCRIPT_NAME)
     JOB_IDS+=($JOB_ID)
-    
+
     echo "  -> Job ID: $JOB_ID"
-    
+
     # Optional: Add a small delay to avoid overwhelming the queue system
     sleep 0.1
 done
