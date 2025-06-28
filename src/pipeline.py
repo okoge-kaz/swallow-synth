@@ -183,9 +183,40 @@ def have_linter_errors(item: dict) -> bool:
     return len(item.get("lint_report", [])) > 0 if "lint_report" in item else False
 
 
-def separate_code_samples(input_path: Path, output_path: Path) -> None:
-    """Separate code samples from a JSONL file into two categories: with linter errors and without linter errors."""
-    with_errors_path = output_path / "with_errors.jsonl"
+def separate_code_samples(
+    input_path: Path,
+    output_path: Path,
+    tokenizer_path: Path,
+    threshold_length: int = 20480,
+) -> None:
+    """Separate code samples with and without linter errors based on a threshold length."""
+    import json
+
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input file {input_path} does not exist")
+
+    longer_samples = []
+    samples = []
+    with input_path.open("r", encoding="utf-8") as fin:
+        for line in fin:
+            item = json.loads(line)
+            assert "text_formatted" in item, "Each item must contain 'text_formatted' key for length checking"
+            text = item.get("text_formatted")
+            if len(text) >= threshold_length * 2:
+                longer_samples.append(item)
+            else:
+                samples.append(item)
+
+    longer_samples_path = output_path.parent / f"{output_path.stem}_longer_samples.jsonl"
+    samples_path = output_path
+
+    with longer_samples_path.open("w", encoding="utf-8") as fout:
+        for item in longer_samples:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+    with samples_path.open("w", encoding="utf-8") as fout:
+        for item in samples:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+    print(f"Separated {len(longer_samples)} longer samples and {len(samples)} regular samples")
 
 
 def llm_auto_fix(
@@ -390,7 +421,7 @@ def llm_auto_fix(
 
 
 def extract_score(text: str) -> int:
-    pattern = r'\[\[(\d+)\]\]'
+    pattern = r"\[\[(\d+)\]\]"
     match = re.search(pattern, text)
 
     if match:
@@ -419,8 +450,7 @@ def llm_scoring(
 ) -> None:
     """LLM-based code quality scoring using GPU processing"""
     pipeline = get_rewrite_pipeline(
-        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size,
-        model_max_length=model_max_length
+        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
     )
 
     total_items = 0
@@ -482,24 +512,22 @@ if __name__ == "__main__":
     p1.add_argument("--batch-size", type=int, default=1000, help="Batch size for CPU processing")
     p1.add_argument("--target-key", type=str, default="text", help="Key in JSON object to format (default: text)")
 
-    # LLM rewrite subcommand
-    p2 = sub.add_parser("llm_rewrite", help="LLM-based code rewriting using GPU processing")
+    # LLM auto-fix subcommand
+    p2 = sub.add_parser("llm_auto_fix", help="LLM-based automatic bug fixing")
     p2.add_argument("--input-jsonl", type=Path, required=True)
     p2.add_argument("--output-dir", type=Path, required=True)
     p2.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
     p2.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
-    p2.add_argument("--batch-size", type=int, default=32, help="Batch size for GPU processing")
+    p2.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p2.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p2.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length")
 
-    # LLM auto-fix subcommand
-    p3 = sub.add_parser("llm_auto_fix", help="LLM-based automatic bug fixing")
-    p3.add_argument("--input-jsonl", type=Path, required=True)
-    p3.add_argument("--output-dir", type=Path, required=True)
-    p3.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
-    p3.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
-    p3.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
-    p3.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
-    p3.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length")
+    # separate long context data
+    p3 = sub.add_parser("long_context_sample", help="Separate code samples with and without linter errors")
+    p3.add_argument("--input-jsonl", type=Path, required=True, help="Input JSONL file containing code samples")
+    p3.add_argument("--output-path", type=Path, required=True, help="Output JSONL file path to save separated files")
+    p3.add_argument("--tokenizer", type=Path)
+    p3.add_argument("--threshold-length", type=int, default=20480, help="Threshold length for separating samples")
 
     # LLM scoring subcommand
     p4 = sub.add_parser("llm_scoring", help="LLM-based code quality scoring")
@@ -532,6 +560,13 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
+        )
+    elif args.cmd == "long_context_sample":
+        separate_code_samples(
+            input_path=args.input_jsonl,
+            output_path=args.output_path,
+            tokenizer_path=args.tokenizer,
+            threshold_length=args.threshold_length,
         )
     elif args.cmd == "llm_scoring":
         llm_scoring(

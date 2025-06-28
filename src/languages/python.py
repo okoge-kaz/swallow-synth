@@ -150,10 +150,7 @@ class PythonRewritePipeline(RewritePipeline):
                 "Consider reducing the input size or using a smaller model."
             )
 
-        outputs = self.llm.generate(
-            prompts, SamplingParams(
-                temperature=0, max_tokens=self.max_model_len - max_len)
-        )
+        outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
         return [output.outputs[0].text for output in outputs]  # type: ignore
 
     def rewrite_style(self, codes: list[str], lint_reports: list[str]) -> list[str]:
