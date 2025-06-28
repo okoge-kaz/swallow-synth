@@ -41,3 +41,15 @@ class RewritePipeline(ABC):
             list[str]: The fixed code snippets.
         """
         raise NotImplementedError("This method should be implemented by subclasses.")
+
+    def get_scores(self, codes: list[str]) -> list[str]:
+        """
+        Get scores for the provided codes.
+
+        Args:
+            codes (list[str]): The list of code snippets to score.
+
+        Returns:
+            list[str]: The scores for the code snippets.
+        """
+        raise NotImplementedError("This method should be implemented by subclasses.")

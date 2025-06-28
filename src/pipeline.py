@@ -1,4 +1,6 @@
 import json
+import re
+import os
 import time
 from pathlib import Path
 from multiprocessing import Pool, cpu_count
@@ -387,20 +389,80 @@ def llm_auto_fix(
         print("No items with errors found")
 
 
+def extract_score(text: str) -> int:
+    pattern = r'\[\[(\d+)\]\]'
+    match = re.search(pattern, text)
+
+    if match:
+        return int(match.group(1))
+    else:
+        return 0
+
+
+def extract_scores_from_multiple_texts(texts: list[str]) -> list[int]:
+    scores = []
+    for i, text in enumerate(texts):
+        score = extract_score(text)
+        scores.append(score)
+    return scores
+
+
 def llm_scoring(
     input_path: Path,
     output_path: Path,
     lang: str,
     model_name: str = "qwen-3",
-    batch_size: int = 32,
+    batch_size: int = 1024,
     tensor_parallel_size: int = 1,
+    compare_model: bool = False,
+    model_max_length: int = 40960,
 ) -> None:
-    """LLM-based code quality scoring"""
-    # TODO: Implement LLM scoring functionality
-    print("LLM scoring functionality not yet implemented")
-    # 1. Load the input JSONL file
-    # 2. Use the LLM to score the code samples
-    pass
+    """LLM-based code quality scoring using GPU processing"""
+    pipeline = get_rewrite_pipeline(
+        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size,
+        model_max_length=model_max_length
+    )
+
+    total_items = 0
+    start_time = time.time()
+
+    print(f"Starting LLM scoring with {tensor_parallel_size} GPUs...")
+
+    model_name = os.path.basename(model_name)
+    if compare_model:
+        score_key = f"{model_name}_score"
+        evaluation_key = f"{model_name}_evaluation"
+    else:
+        score_key = "score"
+        evaluation_key = f"{model_name}_evaluation"
+
+    with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
+        for batch in stream_jsonl(input_path, batch_size):
+            total_items += len(batch)
+            print(f"Processing batch of {len(batch)} items...")
+
+            # key in batch should be "text_formatted" for LLM scoring
+            if not all("text_formatted" in item for item in batch):
+                raise ValueError("All items in the batch must contain 'text_formatted' key for LLM scoring")
+            codes = [item.get("text_formatted", "") for item in batch]
+
+            # Call pipeline.score_codes
+            try:
+                evaluations = pipeline.get_scores(codes)
+                scores = extract_scores_from_multiple_texts(evaluations)
+
+                # Write results to output file
+                for index, item in enumerate(batch):
+                    score = scores[index] if index < len(scores) else 0  # Default to
+                    item[score_key] = score
+                    item[evaluation_key] = evaluations[index] if index < len(evaluations) else ""
+                    fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+            except Exception as e:
+                print(f"Error during scoring: {e}")
+
+    actual_time = time.time() - start_time
+    print(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
 # === CLI Entrypoint ===
@@ -447,6 +509,8 @@ if __name__ == "__main__":
     p4.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p4.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p4.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p4.add_argument("--compare-model", action="store_true", help="Compare with another model")
+    p4.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for scoring")
 
     args = parser.parse_args()
 
@@ -477,4 +541,6 @@ if __name__ == "__main__":
             lang=args.lang,
             batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
+            compare_model=args.compare_model,
+            model_max_length=args.model_max_length,
         )
