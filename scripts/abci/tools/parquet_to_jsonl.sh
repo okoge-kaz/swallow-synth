@@ -18,7 +18,7 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-PARQUET_FILE_DIR="/groups/gag51395/datasets/instruct/OpenCodeReasoning/split_1"
+PARQUET_FILE_DIR="/groups/gag51395/datasets/raw/pretrain/cosmopedia/data/web_samples_v2"
 JSONL_FILE_DIR="$PARQUET_FILE_DIR-jsonl"
 mkdir -p "${JSONL_FILE_DIR}"
 
