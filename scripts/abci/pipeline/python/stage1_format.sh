@@ -20,7 +20,7 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-INDEX=0
+INDEX=8
 
 INPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/the-stack-v2/the-stack-v2/data/Python/train-0000$INDEX-of-00009.parquet/train-0000$INDEX-of-00009
 OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage1/python
@@ -51,7 +51,7 @@ for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
   echo "Output: $OUTPUT_FILE (INDEX=$INDEX, FILE_NUMBER=$FILE_NUMBER, FILE_INDEX=$FILE_INDEX)"
 
   export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-  uv run python src/pipeline.py cpu \
+  uv run python src/pipeline.py auto_format \
     --input-jsonl $FILE \
     --output-jsonl $OUTPUT_FILE \
     --workers 16 \
