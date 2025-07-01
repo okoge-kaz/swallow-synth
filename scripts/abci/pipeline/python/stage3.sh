@@ -29,8 +29,8 @@ export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
 
 # 処理範囲の設定
-MIN_INDEX=0
-MAX_INDEX=154
+MIN_INDEX=1
+MAX_INDEX=162
 
 echo "Processing INDEX range: $(printf "%04d" $MIN_INDEX) to $(printf "%04d" $MAX_INDEX)"
 echo "Input directory: $INPUT_DIR"
