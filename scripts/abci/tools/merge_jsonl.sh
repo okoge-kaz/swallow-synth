@@ -18,7 +18,7 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-INPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-cosmopedia/auto_math_text"
+INPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-cosmopedia/stanford"
 OUTPUT_FILE=${INPUT_DIR}/merged.jsonl
 
 python src/tools/merge_jsonl.py \
