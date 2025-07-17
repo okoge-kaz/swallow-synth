@@ -33,11 +33,11 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage3/python/train_${INDEX}_without_errors.jsonl"
+INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage3/python/train_${INDEX}.jsonl"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python"
 mkdir -p $OUTPUT_DIR
 
-MODEL_NAME=Qwen3-30B-A3B
+MODEL_NAME=Qwen3-14B
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export TOKENIZERS_PARALLELISM="false"
