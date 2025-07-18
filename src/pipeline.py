@@ -160,6 +160,23 @@ def auto_format(
         print(f"Auto-format processing completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
+def extract_rewritten_code(text: str) -> str:
+    import re
+
+    start_marker = "<|REWRITTEN_CODE|>:"
+    start_index = text.find(start_marker)
+    if start_index == -1:
+        return ""
+
+    text = text[start_index + len(start_marker) :]
+
+    pattern = r"```python\n(.*?)\n```"
+    match = re.search(pattern, text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
 def llm_rewrite(
     input_path: Path,
     output_path: Path,
@@ -175,7 +192,37 @@ def llm_rewrite(
     )
 
     total_items = 0
-    pass
+    start_time = time.time()
+
+    print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs...")
+
+    with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
+        for batch in stream_jsonl(input_path, batch_size):
+            total_items += len(batch)
+            print(f"Processing batch of {len(batch)} items...")
+
+            # key in batch should be "text_formatted" for rewriting
+            if not all("text_formatted" in item for item in batch):
+                raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
+            codes = [item.get("text_formatted", "") for item in batch]
+
+            # Call pipeline.rewrite_codes
+            try:
+                rewritten_texts = pipeline.rewrite_codes(codes)
+
+                # Write results to output file
+                for index, item in enumerate(batch):
+                    rewritten_text = rewritten_texts[index] if index < len(rewritten_texts) else ""
+                    rewritten_code = extract_rewritten_code(rewritten_text)
+                    item["improved_text"] = rewritten_text
+                    item["improved_code"] = rewritten_code
+                    fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+            except Exception as e:
+                print(f"Error during rewriting: {e}")
+
+    actual_time = time.time() - start_time
+    print(f"LLM rewriting completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
 def have_linter_errors(item: dict) -> bool:
@@ -540,9 +587,19 @@ if __name__ == "__main__":
     p4.add_argument("--compare-model", action="store_true", help="Compare with another model")
     p4.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for scoring")
 
+    # LLM rewrite subcommand
+    p5 = sub.add_parser("rewrite", help="LLM-based code rewriting")
+    p5.add_argument("--input-jsonl", type=Path, required=True)
+    p5.add_argument("--output-jsonl", type=Path, required=True)
+    p5.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
+    p5.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
+    p5.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
+    p5.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p5.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
+
     args = parser.parse_args()
 
-    if args.cmd == "auto_format":
+    if args.cmd == "auto_format":  # stage 1
         auto_format(
             input_path=args.input_jsonl,
             output_path=args.output_jsonl,
@@ -551,7 +608,7 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             target_key=args.target_key,
         )
-    elif args.cmd == "llm_auto_fix":
+    elif args.cmd == "llm_auto_fix":  # stage 2
         llm_auto_fix(
             input_path=args.input_jsonl,
             output_dir=args.output_dir,
@@ -561,14 +618,14 @@ if __name__ == "__main__":
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
         )
-    elif args.cmd == "long_context_sample":
+    elif args.cmd == "long_context_sample":  # stage 3
         separate_code_samples(
             input_path=args.input_jsonl,
             output_path=args.output_path,
             tokenizer_path=args.tokenizer,
             threshold_length=args.threshold_length,
         )
-    elif args.cmd == "llm_scoring":
+    elif args.cmd == "llm_scoring":  # stage 4
         llm_scoring(
             input_path=args.input_jsonl,
             output_path=args.output_jsonl,
@@ -579,3 +636,15 @@ if __name__ == "__main__":
             compare_model=args.compare_model,
             model_max_length=args.model_max_length,
         )
+    elif args.cmd == "rewrite":
+        llm_rewrite(
+            input_path=args.input_jsonl,
+            output_path=args.output_jsonl,
+            lang=args.lang,
+            model_name=args.model,
+            batch_size=args.batch_size,
+            tensor_parallel_size=args.tensor_parallel_size,
+            model_max_length=args.model_max_length,
+        )
+    else:
+        raise ValueError(f"Unknown command: {args.cmd}")
