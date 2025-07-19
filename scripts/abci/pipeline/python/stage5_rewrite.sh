@@ -13,7 +13,7 @@
 set -e
 cd $PBS_O_WORKDIR
 
-echo "Nodes allocated to this job:"Add commentMore actions
+echo "Nodes allocated to this job:"
 cat $PBS_NODEFILE
 
 # Check if INDEX is provided
@@ -22,6 +22,8 @@ if [ -z "$INDEX" ]; then
   echo "Usage: qsub -v INDEX=0002 stage5_rewrite.sh"
   exit 1
 fi
+
+module load cuda/12.6/12.6.1
 
 # Format INDEX to 4 digits with leading zeros
 INDEX=$(printf "%04d" $INDEX)
@@ -33,7 +35,9 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python/low_medium_high/train_${INDEX}_Qwen3-14B_medium_Qwen3-14B.jsonl"
+QUALITY=high
+
+INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python/low_medium_high/train_${INDEX}_Qwen3-14B_${QUALITY}_Qwen3-14B.json"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python"
 mkdir -p $OUTPUT_DIR
 
@@ -44,8 +48,8 @@ export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
 uv run python src/pipeline.py rewrite \
   --input-jsonl $INPUT_FILE_PATH \
-  --output-jsonl $OUTPUT_DIR/train_${INDEX}_${MODEL_NAME}.jsonl \
+  --output-jsonl $OUTPUT_DIR/train_${INDEX}_${QUALITY}_${MODEL_NAME}.jsonl \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
-  --batch-size 30 \
+  --batch-size 4096 \
   --tensor-parallel-size 8
