@@ -60,29 +60,20 @@ class DataGenerationPipeline:
         from vllm import LLM, SamplingParams
 
         llm = LLM(
-            model=self.model_name,
-            tensor_parallel_size=self.tensor_parallel_size,
-            max_model_len=self.model_max_length
+            model=self.model_name, tensor_parallel_size=self.tensor_parallel_size, max_model_len=self.model_max_length
         )
 
-        sampling_params = SamplingParams(
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_new_tokens
-        )
+        sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_new_tokens)
 
         # Apply chat template with thinking mode
         formatted_prompts = []
         for prompt in prompts:
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt}
-            ]
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
             formatted_prompt = llm.get_tokenizer().apply_chat_template(
                 messages,  # type: ignore
                 tokenize=False,
                 add_generation_prompt=True,
-                enable_thinking=self.enable_thinking
+                enable_thinking=self.enable_thinking,
             )
             formatted_prompts.append(formatted_prompt)
 
@@ -169,7 +160,8 @@ def llm_data_generation(
             # Generate responses using the pipeline
             try:
                 generated_texts = pipeline.generate_from_prompts(
-                    prompts, max_new_tokens=max_new_tokens,
+                    prompts,
+                    max_new_tokens=max_new_tokens,
                 )
 
                 # Write results to output file
