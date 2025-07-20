@@ -1,12 +1,10 @@
 import ast
 import subprocess
-import json
 import tempfile
 import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
-from regex import P
 from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 from src.prompts.python.stage2 import PYTHON_STAGE2_PROMPT

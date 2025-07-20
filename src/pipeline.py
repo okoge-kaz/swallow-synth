@@ -680,7 +680,9 @@ if __name__ == "__main__":
     p7.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file to save formatted items")
     p7.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p7.add_argument("--batch-size", type=int, default=1000, help="Batch size for processing")
-    p7.add_argument("--target-key", type=str, default="improved_code", help="Key in JSON object to format (default: text)")
+    p7.add_argument(
+        "--target-key", type=str, default="improved_code", help="Key in JSON object to format (default: text)"
+    )
     p7.add_argument("--workers", type=int, default=16, help="Number of CPU workers for formatting")
 
     args = parser.parse_args()
