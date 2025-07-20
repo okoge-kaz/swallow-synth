@@ -37,7 +37,7 @@ def get_rewrite_pipeline(
 
 def process_chunk_to_file(args):
     """Process a chunk of items and write to a separate file"""
-    chunk, process_func, temp_dir, worker_id = args
+    chunk, process_func, temp_dir, worker_id, target_key = args
 
     # Create a unique temporary file for this worker
     temp_file = temp_dir / f"worker_{worker_id}.jsonl"
@@ -46,7 +46,7 @@ def process_chunk_to_file(args):
 
     with temp_file.open("w", encoding="utf-8") as fout:
         for item in chunk:
-            result = process_func(item)
+            result = process_func(item, target_key)
             fout.write(json.dumps(result, ensure_ascii=False) + "\n")
 
     processing_time = time.time() - start_time
@@ -135,7 +135,7 @@ def auto_format(
                 chunks = split_into_chunks(batch, n_workers)
 
                 # Prepare arguments for each worker
-                args_list = [(chunk, process_item_cpu, temp_dir, i) for i, chunk in enumerate(chunks)]
+                args_list = [(chunk, process_item_cpu, temp_dir, i, target_key) for i, chunk in enumerate(chunks)]
 
                 # Process chunks in parallel
                 worker_results = pool.map(process_chunk_to_file, args_list)
@@ -675,6 +675,15 @@ if __name__ == "__main__":
     p6.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p6.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
 
+    # format check
+    p7 = sub.add_parser("format_check", help="Check if the input JSONL file is properly formatted")
+    p7.add_argument("--input-jsonl", type=Path, required=True, help="Input JSONL file to check format")
+    p7.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file to save formatted items")
+    p7.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
+    p7.add_argument("--batch-size", type=int, default=1000, help="Batch size for processing")
+    p7.add_argument("--target-key", type=str, default="improved_code", help="Key in JSON object to format (default: text)")
+    p7.add_argument("--workers", type=int, default=16, help="Number of CPU workers for formatting")
+
     args = parser.parse_args()
 
     if args.cmd == "auto_format":  # stage 1
@@ -733,6 +742,15 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
+        )
+    elif args.cmd == "format_check":  # stage 6
+        auto_format(
+            input_path=args.input_jsonl,
+            output_path=args.output_jsonl,
+            n_workers=args.workers,
+            lang=args.lang,
+            batch_size=args.batch_size,
+            target_key=args.target_key,
         )
     else:
         raise ValueError(f"Unknown command: {args.cmd}")
