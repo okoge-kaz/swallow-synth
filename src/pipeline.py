@@ -7,6 +7,7 @@ from multiprocessing import Pool, cpu_count
 from typing import Callable, Any, Iterator
 import tempfile
 
+from prompts.python import competitive_programming
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
     PythonRewritePipeline,
@@ -177,6 +178,23 @@ def extract_rewritten_code(text: str) -> str:
     return ""
 
 
+def extract_generated_code(text: str) -> str:
+    import re
+
+    start_marker = "<|GENERATED_CODE|>:"
+    start_index = text.find(start_marker)
+    if start_index == -1:
+        return ""
+
+    text = text[start_index + len(start_marker) :]
+
+    pattern = r"```python\n(.*?)\n```"
+    match = re.search(pattern, text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+
 def llm_rewrite(
     input_path: Path,
     output_path: Path,
@@ -223,6 +241,56 @@ def llm_rewrite(
 
     actual_time = time.time() - start_time
     print(f"LLM rewriting completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
+
+
+def competitive_programming_write(
+    input_path: Path,
+    output_path: Path,
+    lang: str,
+    model_name: str = "qwen-3",
+    batch_size: int = 32,
+    tensor_parallel_size: int = 1,
+    model_max_length: int = 40960,
+) -> None:
+    """LLM-based code rewriting for competitive programming using GPU processing"""
+    pipeline = get_rewrite_pipeline(
+        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+    )
+
+    total_items = 0
+    start_time = time.time()
+
+    print(f"Starting competitive programming LLM rewriting with {tensor_parallel_size} GPUs...")
+
+    with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
+        for batch in stream_jsonl(input_path, batch_size):
+            total_items += len(batch)
+            print(f"Processing batch of {len(batch)} items...")
+
+            # key in batch should be "text_formatted" for rewriting
+            if not all("question" in item for item in batch):
+                raise ValueError("All items in the batch must contain 'question' key for code generation")
+            questions = [item.get("question", "") for item in batch]
+
+            # Call pipeline.rewrite_codes
+            try:
+                generated_texts = pipeline.competitive_programming_write(questions)
+
+                # Write results to output file
+                for index, item in enumerate(batch):
+                    generated_text = generated_texts[index] if index < len(generated_texts) else ""
+                    generated_code = extract_generated_code(generated_text)
+                    item["generated_text"] = generated_text
+                    item["text"] = generated_code
+                    fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+            except Exception as e:
+                print(f"Error during rewriting: {e}")
+
+    actual_time = time.time() - start_time
+    print(
+        f"Competitive programming LLM rewriting completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)"
+    )
 
 
 def have_linter_errors(item: dict) -> bool:
@@ -597,6 +665,16 @@ if __name__ == "__main__":
     p5.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p5.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
 
+    # Competitive Programming LLM write subcommand
+    p6 = sub.add_parser("competitive_programming_write", help="LLM-based code generation for competitive programming")
+    p6.add_argument("--input-jsonl", type=Path, required=True)
+    p6.add_argument("--output-jsonl", type=Path, required=True)
+    p6.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
+    p6.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
+    p6.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
+    p6.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p6.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
+
     args = parser.parse_args()
 
     if args.cmd == "auto_format":  # stage 1
@@ -636,8 +714,18 @@ if __name__ == "__main__":
             compare_model=args.compare_model,
             model_max_length=args.model_max_length,
         )
-    elif args.cmd == "rewrite":
+    elif args.cmd == "rewrite":  # stage 5
         llm_rewrite(
+            input_path=args.input_jsonl,
+            output_path=args.output_jsonl,
+            lang=args.lang,
+            model_name=args.model,
+            batch_size=args.batch_size,
+            tensor_parallel_size=args.tensor_parallel_size,
+            model_max_length=args.model_max_length,
+        )
+    elif args.cmd == "competitive_programming_write":
+        competitive_programming_write(
             input_path=args.input_jsonl,
             output_path=args.output_jsonl,
             lang=args.lang,

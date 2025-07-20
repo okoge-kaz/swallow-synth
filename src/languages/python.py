@@ -12,6 +12,7 @@ from transformers import AutoTokenizer
 from src.prompts.python.stage2 import PYTHON_STAGE2_PROMPT
 from src.prompts.python.stage4 import PYTHON_STAGE4_PROMPT
 from src.prompts.python.stage5 import PYTHON_STAGE5_REWRITE_PROMPT
+from src.prompts.python.competitive_programming import PYTHON_COMPETITIVE_PROGRAMMING_PROMPT
 from src.languages.abc import RewritePipeline
 
 # === CPU Stage: Syntax check, fast format (ruff), lint (ruff) ===
@@ -182,3 +183,31 @@ class PythonRewritePipeline(RewritePipeline):
             )
         outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
         return [output.outputs[0].text for output in outputs]  # type: ignore
+
+    def competitive_programming_write(self, questions: List[str]) -> List[str]:
+        # Construct chat templates for batch processing
+        prompts: List[str] = []
+
+        PROMPT = PYTHON_COMPETITIVE_PROGRAMMING_PROMPT
+
+        for question in questions:
+            prompt = (
+                "<|im_start|>system\n"
+                + PROMPT
+                + "<|im_end|>\n"
+                + "<|im_start|>user\n"
+                + f"{question}\n"
+                + "<|im_end|>\n"
+                + "<|im_start|>assistant\n"
+            )
+            prompts.append(prompt)
+
+        tokenized_prompts_len = [len(self.tokenizer.encode(prompt)) for prompt in prompts]
+        max_len = max(tokenized_prompts_len)
+        if max_len >= self.max_model_len:
+            raise ValueError(
+                f"Prompt length exceeds model limit: {max_len} >= {self.max_model_len}. "
+                "Consider reducing the input size or using a smaller model."
+            )
+        outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
+        return [output.outputs[0].text for output in outputs]
