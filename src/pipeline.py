@@ -7,7 +7,6 @@ from multiprocessing import Pool, cpu_count
 from typing import Callable, Any, Iterator
 import tempfile
 
-from prompts.python import competitive_programming
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
     PythonRewritePipeline,
