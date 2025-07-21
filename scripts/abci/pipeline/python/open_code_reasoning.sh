@@ -34,7 +34,7 @@ source .venv/bin/activate
 
 MODEL_NAME=Qwen3-235B-A22B
 
-INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/competitive_programming/python/open_code_reasoning/train_${INDEX}.json"
+INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/competitive_programming/python/open_code_reasoning/train_${INDEX}.jsonl"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/competitive_programming/python/open_code_reasoning-${MODEL_NAME}"
 mkdir -p $OUTPUT_DIR
 
