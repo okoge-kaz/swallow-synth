@@ -609,6 +609,95 @@ def llm_scoring(
     print(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
+def final_processing(
+    input_dir: Path,
+    output_dir: Path,
+) -> None:
+    """
+    Process all .jsonl files in input_dir and separate them based on quality criteria.
+    Items are classified as errors if they have:
+    1. Linter errors, OR
+    2. improved_code != text_formatted, OR
+    3. text_formatted length < 10
+    Only items that pass all quality checks go to train.jsonl.
+    """
+    # Ensure output directory exists
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Find all .jsonl files in input directory
+    jsonl_files = list(input_dir.glob("*.jsonl"))
+    if not jsonl_files:
+        print(f"No .jsonl files found in {input_dir}")
+        return
+
+    print(f"Found {len(jsonl_files)} .jsonl files to process")
+
+    # Initialize lists to collect items and statistics
+    train_items = []
+    error_items = []
+
+    # Statistics counters
+    total_items = 0
+    linter_errors_count = 0
+    text_formatted_length_less_than_10 = 0
+
+    # Process each .jsonl file
+    for jsonl_file in jsonl_files:
+        print(f"Processing {jsonl_file.name}...")
+
+        with jsonl_file.open("r", encoding="utf-8") as fin:
+            for line in fin:
+                item = json.loads(line)
+                total_items += 1
+
+                # Check additional conditions
+                text_formatted = item.get("text_formatted", "")
+
+                # Check conditions
+                has_linter_errors = have_linter_errors(item)
+                text_formatted_long_enough = len(text_formatted) >= 10
+
+                # Count statistics
+                if has_linter_errors:
+                    linter_errors_count += 1
+                if not text_formatted_long_enough:
+                    text_formatted_length_less_than_10 += 1
+
+                # Determine if item should go to errors
+                # Item goes to errors if:
+                # 1. Has linter errors, OR
+                # 2. improved_code != text_formatted, OR
+                # 3. text_formatted length < 10
+                if has_linter_errors or not text_formatted_long_enough:
+                    error_items.append(item)
+                else:
+                    train_items.append(item)
+
+    # Write output files
+    train_output_path = output_dir / "train.jsonl"
+    errors_output_path = output_dir / "errors.jsonl"
+
+    print(f"Writing {len(train_items)} items to {train_output_path}")
+    with train_output_path.open("w", encoding="utf-8") as fout:
+        for item in train_items:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    print(f"Writing {len(error_items)} items to {errors_output_path}")
+    with errors_output_path.open("w", encoding="utf-8") as fout:
+        for item in error_items:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    print(f"Final processing completed:")
+    print(f"  Total items processed: {total_items}")
+    print(f"  Items without errors (train): {len(train_items)}")
+    print(f"  Items with errors: {len(error_items)}")
+    print(f"  Items with linter errors: {linter_errors_count} ({linter_errors_count / total_items * 100:.1f}%)")
+    print(
+        f"  Items with text_formatted length < 10: {text_formatted_length_less_than_10} ({text_formatted_length_less_than_10 / total_items * 100:.1f}%)"
+    )
+    print(f"  Output saved to: {output_dir}")
+
+
 # === CLI Entrypoint ===
 
 if __name__ == "__main__":
@@ -685,6 +774,11 @@ if __name__ == "__main__":
     )
     p7.add_argument("--workers", type=int, default=16, help="Number of CPU workers for formatting")
 
+    # final
+    p8 = sub.add_parser("final", help="Run the entire pipeline in sequence")
+    p8.add_argument("--input-dir", type=Path, required=True, help="Input directory containing JSONL files")
+    p8.add_argument("--output-dir", type=Path, required=True, help="Output directory to save final results")
+
     args = parser.parse_args()
 
     if args.cmd == "auto_format":  # stage 1
@@ -752,6 +846,11 @@ if __name__ == "__main__":
             lang=args.lang,
             batch_size=args.batch_size,
             target_key=args.target_key,
+        )
+    elif args.cmd == "final":  # stage 7
+        final_processing(
+            input_dir=args.input_dir,
+            output_dir=args.output_dir,
         )
     else:
         raise ValueError(f"Unknown command: {args.cmd}")

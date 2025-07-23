@@ -29,7 +29,7 @@ fi
 INDEX=$(printf "%04d" $INDEX)
 QUALITY=high
 
-INPUT_FILE=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python/train+${INDEX}_${QUALITY}_Qwen3-235B-A22B.jsonl
+INPUT_FILE=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python/train_${INDEX}_${QUALITY}_Qwen3-235B-A22B.jsonl
 OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/python/${QUALITY}_quality
 
 OUTPUT_FILE=${OUTPUT_FILE_DIR}/train_${INDEX}_${QUALITY}_Qwen3-235B-A22B.jsonl
