@@ -166,6 +166,10 @@ def extract_rewritten_code(text: str) -> str:
     start_marker = "<|REWRITTEN_CODE|>:"
     start_index = text.find(start_marker)
     if start_index == -1:
+        pattern = r"```python\n(.*?)\n```"
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
         return ""
 
     text = text[start_index + len(start_marker) :]
@@ -617,8 +621,7 @@ def final_processing(
     Process all .jsonl files in input_dir and separate them based on quality criteria.
     Items are classified as errors if they have:
     1. Linter errors, OR
-    2. improved_code != text_formatted, OR
-    3. text_formatted length < 10
+    2. text_formatted length < 10
     Only items that pass all quality checks go to train.jsonl.
     """
     # Ensure output directory exists

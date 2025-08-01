@@ -1,4 +1,17 @@
 {
+    "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.venv/*/**": true,
+    "**/outputs/**": true,
+    "**/hostfile/**": true,
+    "**/__pycache__/**": true,
+    "**/wandb/**": true,
+    "**/data/**": true,
+    "**/tensorboard/**": true,
+    "**/apex/**": true,
+    "**/tests/**": true,
+  },
   "cSpell.words": [
     "PYTHONPATH"
   ]

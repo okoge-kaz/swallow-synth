@@ -27,7 +27,7 @@ if [ -z "$INDEX" ]; then
   exit 1
 fi
 INDEX=$(printf "%04d" $INDEX)
-QUALITY=high
+QUALITY=medium
 
 INPUT_FILE=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python/train_${INDEX}_${QUALITY}_Qwen3-235B-A22B.jsonl
 OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/python/${QUALITY}_quality
@@ -41,4 +41,5 @@ uv run python src/pipeline.py format_check \
   --output-jsonl $OUTPUT_FILE \
   --workers 16 \
   --lang python \
-  --batch-size 1024
+  --batch-size 1024 \
+  --target-key "improved_code"

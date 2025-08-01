@@ -20,8 +20,8 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-INPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/python/high_quality"
-OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage7/python/high_quality"
+INPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/python/medium_quality"
+OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage7/python/medium_quality"
 mkdir -p $OUTPUT_DIR
 
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
