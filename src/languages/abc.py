@@ -54,12 +54,13 @@ class RewritePipeline(ABC):
         """
         raise NotImplementedError("This method should be implemented by subclasses.")
 
-    def rewrite_codes(self, codes: list[str]) -> list[str]:
+    def rewrite_codes(self, codes: list[str], prompt_type: str = "stage5") -> list[str]:
         """
         Rewrite the provided codes using the model.
 
         Args:
             codes (list[str]): The list of code snippets to rewrite.
+            prompt_type (str): The type of prompt to use for rewriting (e.g., "stage5", "stage8").
 
         Returns:
             list[str]: The rewritten code snippets.

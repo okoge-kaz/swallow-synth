@@ -206,6 +206,7 @@ def llm_rewrite(
     batch_size: int = 32,
     tensor_parallel_size: int = 1,
     model_max_length: int = 40960,
+    prompt_type: str = "stage5",
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     pipeline = get_rewrite_pipeline(
@@ -215,7 +216,7 @@ def llm_rewrite(
     total_items = 0
     start_time = time.time()
 
-    print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs...")
+    print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
 
     with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
         for batch in stream_jsonl(input_path, batch_size):
@@ -227,9 +228,9 @@ def llm_rewrite(
                 raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
             codes = [item.get("text_formatted", "") for item in batch]
 
-            # Call pipeline.rewrite_codes
+            # Call pipeline.rewrite_codes with specified prompt type
             try:
-                rewritten_texts = pipeline.rewrite_codes(codes)
+                rewritten_texts = pipeline.rewrite_codes(codes, prompt_type=prompt_type)
 
                 # Write results to output file
                 for index, item in enumerate(batch):
@@ -613,16 +614,66 @@ def llm_scoring(
     print(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
-def final_processing(
+def process_file_filter(args):
+    """Process a single file and filter out error-containing data"""
+    file_path, output_dir = args
+
+    filtered_items = []
+    file_stats = {"total_items": 0, "linter_errors_count": 0, "text_formatted_length_less_than_10": 0}
+
+    print(f"Processing {file_path.name}...")
+
+    with file_path.open("r", encoding="utf-8") as fin:
+        for line in fin:
+            item = json.loads(line)
+            file_stats["total_items"] += 1
+
+            # Check for various error conditions
+            text_formatted = item.get("text_formatted", "")
+
+            # Check conditions
+            has_linter_errors = have_linter_errors(item)
+            text_formatted_long_enough = len(text_formatted) >= 10
+
+            # Count statistics
+            if has_linter_errors:
+                file_stats["linter_errors_count"] += 1
+            if not text_formatted_long_enough:
+                file_stats["text_formatted_length_less_than_10"] += 1
+
+            # Only keep items that pass all quality checks
+            if not has_linter_errors and text_formatted_long_enough:
+                filtered_items.append(item)
+
+    # Write filtered results for this file
+    file_stem = file_path.stem
+    filtered_output_path = output_dir / f"{file_stem}_filtered.jsonl"
+
+    with filtered_output_path.open("w", encoding="utf-8") as fout:
+        for item in filtered_items:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    return {
+        "file_name": file_path.name,
+        "filtered_items": len(filtered_items),
+        "error_items": file_stats["total_items"] - len(filtered_items),
+        "filtered_output_path": filtered_output_path,
+        "stats": file_stats,
+    }
+
+
+def after_rewrite_filter(
     input_dir: Path,
     output_dir: Path,
+    workers: int | None = None,
 ) -> None:
     """
-    Process all .jsonl files in input_dir and separate them based on quality criteria.
-    Items are classified as errors if they have:
+    Process all .jsonl files in input_dir and filter out data containing errors.
+    Each file is processed independently with multiprocessing support.
+    Items are filtered out if they have:
     1. Linter errors, OR
     2. text_formatted length < 10
-    Only items that pass all quality checks go to train.jsonl.
+    Only clean items are saved to output-dir.
     """
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -635,70 +686,67 @@ def final_processing(
 
     print(f"Found {len(jsonl_files)} .jsonl files to process")
 
-    # Initialize lists to collect items and statistics
-    train_items = []
-    error_items = []
+    # Set default workers to CPU count if not specified
+    if workers is None:
+        workers = cpu_count()
 
-    # Statistics counters
-    total_items = 0
-    linter_errors_count = 0
-    text_formatted_length_less_than_10 = 0
+    print(f"Using {workers} workers for parallel processing")
 
-    # Process each .jsonl file
-    for jsonl_file in jsonl_files:
-        print(f"Processing {jsonl_file.name}...")
+    # Prepare arguments for multiprocessing
+    args_list = [(file_path, output_dir) for file_path in jsonl_files]
 
-        with jsonl_file.open("r", encoding="utf-8") as fin:
-            for line in fin:
-                item = json.loads(line)
-                total_items += 1
+    # Process files in parallel
+    with Pool(workers) as pool:
+        results = pool.map(process_file_filter, args_list)
 
-                # Check additional conditions
-                text_formatted = item.get("text_formatted", "")
+    # Collect and merge all filtered results
+    total_stats = {
+        "total_items": 0,
+        "linter_errors_count": 0,
+        "text_formatted_length_less_than_10": 0,
+        "total_filtered": 0,
+        "total_errors": 0,
+    }
 
-                # Check conditions
-                has_linter_errors = have_linter_errors(item)
-                text_formatted_long_enough = len(text_formatted) >= 10
+    temp_files = []
 
-                # Count statistics
-                if has_linter_errors:
-                    linter_errors_count += 1
-                if not text_formatted_long_enough:
-                    text_formatted_length_less_than_10 += 1
+    for result in results:
+        print(f"  {result['file_name']}: {result['filtered_items']} clean items, {result['error_items']} filtered out")
 
-                # Determine if item should go to errors
-                # Item goes to errors if:
-                # 1. Has linter errors, OR
-                # 2. improved_code != text_formatted, OR
-                # 3. text_formatted length < 10
-                if has_linter_errors or not text_formatted_long_enough:
-                    error_items.append(item)
-                else:
-                    train_items.append(item)
+        # Accumulate statistics
+        for key in total_stats:
+            if key in result["stats"]:
+                total_stats[key] += result["stats"][key]
 
-    # Write output files
-    train_output_path = output_dir / "train.jsonl"
-    errors_output_path = output_dir / "errors.jsonl"
+        total_stats["total_filtered"] += result["filtered_items"]
+        total_stats["total_errors"] += result["error_items"]
+        temp_files.append(result["filtered_output_path"])
 
-    print(f"Writing {len(train_items)} items to {train_output_path}")
-    with train_output_path.open("w", encoding="utf-8") as fout:
-        for item in train_items:
-            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+    # Merge all filtered files into final output
+    final_output_path = output_dir / "train.jsonl"
+    print(f"Merging {len(temp_files)} filtered files into {final_output_path}")
 
-    print(f"Writing {len(error_items)} items to {errors_output_path}")
-    with errors_output_path.open("w", encoding="utf-8") as fout:
-        for item in error_items:
-            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+    with final_output_path.open("w", encoding="utf-8") as fout:
+        for temp_file in temp_files:
+            if temp_file.exists():
+                with temp_file.open("r", encoding="utf-8") as fin:
+                    for line in fin:
+                        fout.write(line)
+                # Clean up temporary file
+                temp_file.unlink()
 
-    print(f"Final processing completed:")
-    print(f"  Total items processed: {total_items}")
-    print(f"  Items without errors (train): {len(train_items)}")
-    print(f"  Items with errors: {len(error_items)}")
-    print(f"  Items with linter errors: {linter_errors_count} ({linter_errors_count / total_items * 100:.1f}%)")
+    # Print final statistics
+    print(f"After-rewrite filtering completed:")
+    print(f"  Total items processed: {total_stats['total_items']}")
+    print(f"  Clean items (saved): {total_stats['total_filtered']}")
+    print(f"  Items filtered out: {total_stats['total_errors']}")
     print(
-        f"  Items with text_formatted length < 10: {text_formatted_length_less_than_10} ({text_formatted_length_less_than_10 / total_items * 100:.1f}%)"
+        f"  Items with linter errors: {total_stats['linter_errors_count']} ({total_stats['linter_errors_count'] / total_stats['total_items'] * 100:.1f}%)"
     )
-    print(f"  Output saved to: {output_dir}")
+    print(
+        f"  Items with text_formatted length < 10: {total_stats['text_formatted_length_less_than_10']} ({total_stats['text_formatted_length_less_than_10'] / total_stats['total_items'] * 100:.1f}%)"
+    )
+    print(f"  Final output saved to: {final_output_path}")
 
 
 # === CLI Entrypoint ===
@@ -755,6 +803,13 @@ if __name__ == "__main__":
     p5.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p5.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p5.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
+    p5.add_argument(
+        "--prompt-type",
+        type=str,
+        default="stage5",
+        choices=["stage5", "stage8"],
+        help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
+    )
 
     # Competitive Programming LLM write subcommand
     p6 = sub.add_parser("competitive_programming_write", help="LLM-based code generation for competitive programming")
@@ -777,10 +832,30 @@ if __name__ == "__main__":
     )
     p7.add_argument("--workers", type=int, default=16, help="Number of CPU workers for formatting")
 
-    # final
-    p8 = sub.add_parser("final", help="Run the entire pipeline in sequence")
+    # filter_rewritten_code
+    p8 = sub.add_parser("filter_rewritten_code", help="Filter out error-containing data from JSONL files")
     p8.add_argument("--input-dir", type=Path, required=True, help="Input directory containing JSONL files")
-    p8.add_argument("--output-dir", type=Path, required=True, help="Output directory to save final results")
+    p8.add_argument("--output-dir", type=Path, required=True, help="Output directory to save filtered results")
+    p8.add_argument(
+        "--workers", type=int, default=None, help="Number of workers for parallel processing (default: CPU count)"
+    )
+
+    # 2nd rewrite
+    p9 = sub.add_parser("second_rewrite", help="Second rewrite stage for code quality improvement")
+    p9.add_argument("--input-jsonl", type=Path, required=True, help="Input JSONL file for second rewrite")
+    p9.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file for second rewrite")
+    p9.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
+    p9.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
+    p9.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
+    p9.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p9.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
+    p9.add_argument(
+        "--prompt-type",
+        type=str,
+        default="stage8",
+        choices=["stage5", "stage8"],
+        help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
+    )
 
     args = parser.parse_args()
 
@@ -830,6 +905,7 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
+            prompt_type=args.prompt_type,
         )
     elif args.cmd == "competitive_programming_write":
         competitive_programming_write(
@@ -841,7 +917,7 @@ if __name__ == "__main__":
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
         )
-    elif args.cmd == "format_check":  # stage 6
+    elif args.cmd == "format_check":  # stage 6, 9
         auto_format(
             input_path=args.input_jsonl,
             output_path=args.output_jsonl,
@@ -850,10 +926,22 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             target_key=args.target_key,
         )
-    elif args.cmd == "final":  # stage 7
-        final_processing(
+    elif args.cmd == "filter_rewritten_code":  # stage 7, 10
+        after_rewrite_filter(
             input_dir=args.input_dir,
             output_dir=args.output_dir,
+            workers=args.workers,
+        )
+    elif args.cmd == "second_rewrite":  # stage 8
+        llm_rewrite(
+            input_path=args.input_jsonl,
+            output_path=args.output_jsonl,
+            lang=args.lang,
+            model_name=args.model,
+            batch_size=args.batch_size,
+            tensor_parallel_size=args.tensor_parallel_size,
+            model_max_length=args.model_max_length,
+            prompt_type=args.prompt_type,
         )
     else:
         raise ValueError(f"Unknown command: {args.cmd}")

@@ -10,6 +10,7 @@ from transformers import AutoTokenizer
 from src.prompts.python.stage2 import PYTHON_STAGE2_PROMPT
 from src.prompts.python.stage4 import PYTHON_STAGE4_PROMPT
 from src.prompts.python.stage5 import PYTHON_STAGE5_REWRITE_PROMPT
+from src.prompts.python.stage8 import PYTHON_STAGE8_REWRITE_PROMPT
 from src.prompts.python.competitive_programming import PYTHON_COMPETITIVE_PROGRAMMING_PROMPT
 from src.languages.abc import RewritePipeline
 
@@ -154,11 +155,17 @@ class PythonRewritePipeline(RewritePipeline):
         outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
         return [output.outputs[0].text for output in outputs]  # type: ignore
 
-    def rewrite_codes(self, codes: list[str]) -> list[str]:
+    def rewrite_codes(self, codes: list[str], prompt_type: str = "stage5") -> list[str]:
         # Construct chat templates for batch processing
         prompts: list[str] = []
 
-        PROMPT = PYTHON_STAGE5_REWRITE_PROMPT
+        # Select prompt based on prompt_type
+        if prompt_type == "stage5":
+            PROMPT = PYTHON_STAGE5_REWRITE_PROMPT
+        elif prompt_type == "stage8":
+            PROMPT = PYTHON_STAGE8_REWRITE_PROMPT
+        else:
+            raise ValueError(f"Unsupported prompt_type: {prompt_type}. Supported types: 'stage5', 'stage8'")
 
         for code in codes:
             prompt = (

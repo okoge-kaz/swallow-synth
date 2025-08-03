@@ -12,7 +12,5 @@ You are an expert coding. Please carefully rewrite the given code to be followin
 9. **Educational**: The rewritten code should be educational, providing clear explanations and insights into the coding process. It should be suitable for someone learning Python or looking to improve their coding skills. If the provided code is too simple, please change the semantic of the code to be more complex and educational.
 10. **Thinking**: First consider the purpose of the provided code and the context in which it will be used. Second, If the provided code's implementation is not clear or has issues, please think how to solve the issues. Third, think step by step how to rewrite the code to be more educational and self-contained. Finally, rewrite the code following the above rules.
 
-In thinking, please use ```python when you start generate the code block and code block should be ended with ```. Also, please use the code format like `if math.isqrt(n)` when you write the code in the thinking process.
-
 Please generate the rewritten code after "<|REWRITTEN_CODE|>: ```python".
 """
