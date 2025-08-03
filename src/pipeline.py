@@ -645,9 +645,9 @@ def process_file_filter(args):
             if not has_linter_errors and text_formatted_long_enough:
                 filtered_items.append(item)
 
-    # Write filtered results for this file
+    # Write filtered results for this file with train_ prefix
     file_stem = file_path.stem
-    filtered_output_path = output_dir / f"{file_stem}_filtered.jsonl"
+    filtered_output_path = output_dir / f"{file_stem}.jsonl"
 
     with filtered_output_path.open("w", encoding="utf-8") as fout:
         for item in filtered_items:
@@ -690,6 +690,9 @@ def after_rewrite_filter(
     if workers is None:
         workers = cpu_count()
 
+    # Limit workers to not exceed the number of files
+    workers = min(workers, len(jsonl_files))
+
     print(f"Using {workers} workers for parallel processing")
 
     # Prepare arguments for multiprocessing
@@ -699,7 +702,7 @@ def after_rewrite_filter(
     with Pool(workers) as pool:
         results = pool.map(process_file_filter, args_list)
 
-    # Collect and merge all filtered results
+    # Collect statistics from all filtered results
     total_stats = {
         "total_items": 0,
         "linter_errors_count": 0,
@@ -707,8 +710,6 @@ def after_rewrite_filter(
         "total_filtered": 0,
         "total_errors": 0,
     }
-
-    temp_files = []
 
     for result in results:
         print(f"  {result['file_name']}: {result['filtered_items']} clean items, {result['error_items']} filtered out")
@@ -720,20 +721,6 @@ def after_rewrite_filter(
 
         total_stats["total_filtered"] += result["filtered_items"]
         total_stats["total_errors"] += result["error_items"]
-        temp_files.append(result["filtered_output_path"])
-
-    # Merge all filtered files into final output
-    final_output_path = output_dir / "train.jsonl"
-    print(f"Merging {len(temp_files)} filtered files into {final_output_path}")
-
-    with final_output_path.open("w", encoding="utf-8") as fout:
-        for temp_file in temp_files:
-            if temp_file.exists():
-                with temp_file.open("r", encoding="utf-8") as fin:
-                    for line in fin:
-                        fout.write(line)
-                # Clean up temporary file
-                temp_file.unlink()
 
     # Print final statistics
     print(f"After-rewrite filtering completed:")
@@ -746,7 +733,7 @@ def after_rewrite_filter(
     print(
         f"  Items with text_formatted length < 10: {total_stats['text_formatted_length_less_than_10']} ({total_stats['text_formatted_length_less_than_10'] / total_stats['total_items'] * 100:.1f}%)"
     )
-    print(f"  Final output saved to: {final_output_path}")
+    print(f"  Individual filtered files saved to: {output_dir}")
 
 
 # === CLI Entrypoint ===

@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -q rt_HF
-#PBS -N stage5
+#PBS -N stage8
 #PBS -l select=1
 #PBS -l walltime=72:00:00
 #PBS -j oe
@@ -8,7 +8,7 @@
 #PBS -v USE_SSH=1
 #PBS -koed
 #PBS -V
-#PBS -o outputs/pipeline/stage5_python
+#PBS -o outputs/pipeline/stage8_python
 
 set -e
 cd $PBS_O_WORKDIR
@@ -37,8 +37,8 @@ source .venv/bin/activate
 
 QUALITY=medium
 
-INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python/low_medium_high/train_${INDEX}_Qwen3-14B_${QUALITY}_Qwen3-14B.json"
-OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python"
+INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage7/python/medium_quality/train_${INDEX}_medium_Qwen3-235B-A22B.jsonl"
+OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage8/python/${QUALITY}"
 mkdir -p $OUTPUT_DIR
 
 MODEL_NAME=Qwen3-235B-A22B-Instruct-2507
@@ -46,9 +46,9 @@ MODEL_NAME=Qwen3-235B-A22B-Instruct-2507
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-uv run python src/pipeline.py rewrite \
+uv run python src/pipeline.py second_rewrite \
   --input-jsonl $INPUT_FILE_PATH \
-  --output-jsonl $OUTPUT_DIR/train_${INDEX}_${QUALITY}_${MODEL_NAME}.jsonl \
+  --output-jsonl $OUTPUT_DIR/train_${INDEX}_${MODEL_NAME}.jsonl \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
   --batch-size 4096 \

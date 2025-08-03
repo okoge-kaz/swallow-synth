@@ -1,8 +1,8 @@
 #!/bin/bash
 #PBS -q rt_HF
 #PBS -N stage7
-#PBS -l select=1:ncpus=32
-#PBS -l walltime=5:00:00
+#PBS -l select=1
+#PBS -l walltime=24:00:00
 #PBS -j oe
 #PBS -m n
 #PBS -v USE_SSH=1
@@ -25,6 +25,6 @@ OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage7/python
 mkdir -p $OUTPUT_DIR
 
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-uv run python src/pipeline.py final \
+uv run python src/pipeline.py filter_rewritten_code \
   --input-dir $INPUT_DIR \
   --output-dir $OUTPUT_DIR
