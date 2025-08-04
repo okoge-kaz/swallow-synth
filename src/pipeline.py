@@ -12,6 +12,7 @@ from src.languages.python import (
     PythonRewritePipeline,
 )
 from src.languages.abc import RewritePipeline
+from src.languages.finemath import math_rewrite
 
 
 def get_process_item_cpu(lang: str) -> Callable:
@@ -844,6 +845,22 @@ if __name__ == "__main__":
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
     )
 
+    # finemath rewrite
+    p10 = sub.add_parser("finemath_rewrite", help="Finemath code rewriting")
+    p10.add_argument("--input-jsonl", type=Path, required=True, help="Input JSONL file for finemath rewrite")
+    p10.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file for finemath rewrite")
+    p10.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
+    p10.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
+    p10.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p10.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
+    p10.add_argument(
+        "--prompt-type",
+        type=str,
+        default="pre-train-text",
+        choices=["pre-train-text"],
+        help="Prompt type for finemath rewriting",
+    )
+
     args = parser.parse_args()
 
     if args.cmd == "auto_format":  # stage 1
@@ -924,6 +941,16 @@ if __name__ == "__main__":
             input_path=args.input_jsonl,
             output_path=args.output_jsonl,
             lang=args.lang,
+            model_name=args.model,
+            batch_size=args.batch_size,
+            tensor_parallel_size=args.tensor_parallel_size,
+            model_max_length=args.model_max_length,
+            prompt_type=args.prompt_type,
+        )
+    elif args.cmd == "finemath_rewrite":
+        math_rewrite(
+            input_path=args.input_jsonl,
+            output_path=args.output_jsonl,
             model_name=args.model,
             batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,

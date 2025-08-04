@@ -1,5 +1,5 @@
 {
-    "files.watcherExclude": {
+  "files.watcherExclude": {
     "**/.git/objects/**": true,
     "**/.git/subtree-cache/**": true,
     "**/.venv/*/**": true,
@@ -13,6 +13,8 @@
     "**/tests/**": true,
   },
   "cSpell.words": [
-    "PYTHONPATH"
+    "Finemath",
+    "PYTHONPATH",
+    "vllm"
   ]
 }
