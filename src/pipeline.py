@@ -857,8 +857,24 @@ if __name__ == "__main__":
         "--prompt-type",
         type=str,
         default="pre-train-text",
-        choices=["pre-train-text"],
+        choices=["pre-train-text", "text-book-style"],
         help="Prompt type for finemath rewriting",
+    )
+
+    # math difficulty scoring
+    p11 = sub.add_parser("math_difficulty_scoring", help="Math difficulty scoring")
+    p11.add_argument("--input-jsonl", type=Path, required=True, help="Input JSONL file for math difficulty scoring")
+    p11.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file for math difficulty scoring")
+    p11.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
+    p11.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
+    p11.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
+    p11.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for scoring")
+    p11.add_argument(
+        "--prompt-type",
+        type=str,
+        default="math_difficulty",
+        choices=["math_difficulty"],
+        help="Prompt type for math difficulty scoring",
     )
 
     args = parser.parse_args()

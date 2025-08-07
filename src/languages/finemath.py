@@ -6,6 +6,7 @@ from typing import List
 from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 from src.prompts.finemath.pretrain_math_text import PRE_TRAIN_MATH_TEXT
+from src.prompts.finemath.textbook_math import TEXT_BOOK_MATH_TEXT
 from src.languages.abc import RewritePipeline
 
 
@@ -37,6 +38,8 @@ class FinemathRewritePipeline(RewritePipeline):
         # Select prompt based on prompt_type
         if prompt_type == "pre-train-text":
             PROMPT = PRE_TRAIN_MATH_TEXT
+        elif prompt_type == "text-book-style":
+            PROMPT = TEXT_BOOK_MATH_TEXT
         else:
             raise ValueError(f"Unsupported prompt_type: {prompt_type}. Supported types: 'pre-train-text'")
 
@@ -46,7 +49,10 @@ class FinemathRewritePipeline(RewritePipeline):
                 + PROMPT
                 + "<|im_end|>\n"
                 + "<|im_start|>user\n"
+                + "### Input\n"
+                + "```\n"
                 + f"{text}\n"
+                + "```\n"
                 + "<|im_end|>\n"
                 + "<|im_start|>assistant\n"
             )
