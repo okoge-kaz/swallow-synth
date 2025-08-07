@@ -8,13 +8,13 @@ You are given text that contains mathematical content, potentially mixed with no
 
 ### Example input 1:
 ```
-1\nJEE Main 2022 (Online) 26th July Morning Shift\n+4\n-1\n\nLet f : R $$\\to$$ R be a continuous function such that $$f(3x) - f(x) = x$$. If $$f(8) = 7$$, then $$f(14)$$ is equal to :\n\nA\n4\nB\n10\nC\n11\nD\n16\n...
+1\nJEE Main 2022 (Online) 26th July Morning Shift\n+4\n-1\n\nLet f : R $$\to$$ R be a continuous function such that $$f(3x) - f(x) = x$$. If $$f(8) = 7$$, then $$f(14)$$ is equal to :\n\nA\n4\nB\n10\nC\n11\nD\n16\n...
 ```
 
 ### Example output 1:
 ```
 <|MATH_TEXT|>
-1. Let \\( f : \\mathbb{R} \\to \\mathbb{R} \\) be a continuous function such that \\( f(3x) - f(x) = x \\). If \\( f(8) = 7 \\), then \\( f(14) \\) is equal to:
+1. Let \( f : \mathbb{R} \to \mathbb{R} \) be a continuous function such that \( f(3x) - f(x) = x \). If \( f(8) = 7 \), then \( f(14) \) is equal to:
    A. 4
    B. 10
    C. 11
@@ -29,14 +29,14 @@ Algorithm\n\nB. Shooting\ntime limit per test\n1 second\nmemory limit per test\n
 ### Example output 2:
 ```
 <|MATH_TEXT|>
-Given \\( n \\) cans in a row, numbered from 1 to \\( n \\), each with durability \\( a_i \\) (where \\( 1 \\leq a_i \\leq 1000 \\)), the number of shots required to knock down the \\( i \\)-th can after \\( x \\) cans have been knocked down is \\( a_i \\cdot x + 1 \\). Find the order of shooting that minimizes the total number of shots to knock down all \\( n \\) cans exactly once, where \\( 2 \\leq n \\leq 1000 \\).
+Given \( n \) cans in a row, numbered from 1 to \( n \), each with durability \( a_i \) (where \( 1 \leq a_i \leq 1000 \)), the number of shots required to knock down the \( i \)-th can after \( x \) cans have been knocked down is \( a_i \cdot x + 1 \). Find the order of shooting that minimizes the total number of shots to knock down all \( n \) cans exactly once, where \( 2 \leq n \leq 1000 \).
 
 Examples:
-1. For \\( n = 3 \\), \\( a_1 = 20 \\), \\( a_2 = 10 \\), \\( a_3 = 20 \\):
+1. For \( n = 3 \), \( a_1 = 20 \), \( a_2 = 10 \), \( a_3 = 20 \):
    - Minimum number of shots: 43
    - Order: 1, 3, 2
 
-2. For \\( n = 4 \\), \\( a_1 = 10 \\), \\( a_2 = 10 \\), \\( a_3 = 10 \\), \\( a_4 = 10 \\):
+2. For \( n = 4 \), \( a_1 = 10 \), \( a_2 = 10 \), \( a_3 = 10 \), \( a_4 = 10 \):
    - Minimum number of shots: 64
    - Order: 2, 1, 4, 3
 ```
