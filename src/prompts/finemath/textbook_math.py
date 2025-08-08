@@ -7,7 +7,6 @@ Key guidelines:
 - Use markdown for formatting, such as bold for key terms, lists, and LaTeX for math equations.
 - If the text involves math or technical symbols, preserve them exactly.
 - Structure your response: Begin with background, then a detailed explanation of the text's content, and if applicable, add step-by-step commentary.
-- For specialized terminology in the text, at the end of your response, create a 'Word List' section where you list and briefly define key terms for supplemental understanding.
 
 ### Example 1: Input
 ```
@@ -22,11 +21,6 @@ In electrical wiring, switches control the flow of electricity to lights or appl
 
 ## Detailed Explanation:
 The text describes a process where a 4-way switch is converted into a single-pole switch. This modification enables the hall/office light to be controlled independently, likely meaning it can now be operated without interference from other switches in the original multi-way setup. To achieve this, one would typically cap off unused wires and connect the switch in a basic on/off configuration, but the text assumes the steps are already outlined elsewhere.
-
-## Word List:
-- **4-way switch**: A type of electrical switch used in conjunction with 3-way switches to control a light from three or more locations.
-- **Single-pole switch**: A basic switch that controls a circuit from one location, turning it on or off.
-- **Independent control**: The ability to operate a device without affecting or being affected by other controls in the system.
 ```
 
 ### Example 2: Input

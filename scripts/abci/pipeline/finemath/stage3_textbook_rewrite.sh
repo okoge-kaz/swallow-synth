@@ -38,12 +38,12 @@ INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/stage2/t
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/stage3"
 mkdir -p $OUTPUT_DIR
 
-MODEL_NAME=Qwen3-30B-A3B-Instruct-2507-FP8
+MODEL_NAME=Qwen3-30B-A3B-Thinking-2507-FP8
 
 export CUDA_VISIBLE_DEVICES=0
 export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-uv run python src/pipeline.py finemath_rewrite \
+python src/pipeline.py finemath_rewrite \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_DIR/train-${INDEX}-${MODEL_NAME}.jsonl \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
