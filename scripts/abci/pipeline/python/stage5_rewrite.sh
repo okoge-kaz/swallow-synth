@@ -35,7 +35,7 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-QUALITY=medium
+QUALITY=high
 
 INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python/low_medium_high/train_${INDEX}_Qwen3-14B_${QUALITY}_Qwen3-14B.json"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python"
