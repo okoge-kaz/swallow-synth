@@ -857,7 +857,7 @@ if __name__ == "__main__":
         "--prompt-type",
         type=str,
         default="pre-train-text",
-        choices=["pre-train-text", "text-book-style"],
+        choices=["pre-train-text", "text-book-style", "question-answer"],
         help="Prompt type for finemath rewriting",
     )
 
