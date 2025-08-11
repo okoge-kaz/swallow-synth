@@ -8,6 +8,9 @@ from transformers import AutoTokenizer
 from src.prompts.finemath.pretrain_math_text import PRE_TRAIN_MATH_TEXT
 from src.prompts.finemath.textbook_math import TEXT_BOOK_MATH_TEXT
 from src.prompts.finemath.question_answer import QUESTION_ANSWER_PROMPT
+from src.prompts.finemath.planning_approach import PLANNING_APPROACH_PROMPT
+from src.prompts.finemath.socratic_method import SOCRATIC_METHOD_PROMPT
+from src.prompts.finemath.multiple_solution import MULTIPLE_SOLUTION_PROMPT
 from src.languages.abc import RewritePipeline
 
 
@@ -43,6 +46,12 @@ class FinemathRewritePipeline(RewritePipeline):
             PROMPT = TEXT_BOOK_MATH_TEXT
         elif prompt_type == "question-answer":
             PROMPT = QUESTION_ANSWER_PROMPT
+        elif prompt_type == "planning-approach":
+            PROMPT = PLANNING_APPROACH_PROMPT
+        elif prompt_type == "socratic-method":
+            PROMPT = SOCRATIC_METHOD_PROMPT
+        elif prompt_type == "multiple-solution":
+            PROMPT = MULTIPLE_SOLUTION_PROMPT
         else:
             raise ValueError(f"Unsupported prompt_type: {prompt_type}. Supported types: 'pre-train-text'")
 
