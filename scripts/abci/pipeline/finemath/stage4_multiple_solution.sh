@@ -37,7 +37,7 @@ source .venv/bin/activate
 MODEL_NAME=Qwen3-30B-A3B-Thinking-2507-FP8
 
 INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/stage2/train-${INDEX}-Qwen3-32B-FP8.jsonl"
-OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/stage4/socratic-method/${MODEL_NAME}"
+OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/stage4/multiple-solution/${MODEL_NAME}"
 mkdir -p $OUTPUT_DIR
 
 export CUDA_VISIBLE_DEVICES=0
@@ -49,4 +49,4 @@ python src/pipeline.py finemath_rewrite \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --batch-size 4096 \
   --tensor-parallel-size 1 \
-  --prompt-type "socratic-method"
+  --prompt-type "multiple-solution"
