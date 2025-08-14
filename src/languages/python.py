@@ -71,13 +71,13 @@ def lint_with_ruff(code: str, tmp_path: Optional[Path] = None) -> str:
         tmp_path.unlink(missing_ok=True)
 
 
-def process_item_cpu(item: Dict[str, Any], key: str = "text") -> Dict[str, Any]:
+def process_item_cpu(item: Dict[str, Any], key: str = "text", output_key: str = "text_formatted") -> Dict[str, Any]:
     code: str = item.get(key, "")
     unique_path = Path(f"tmp_code_{uuid.uuid4().hex[:8]}.py")
 
     # format (includes syntax check)
     formatted, format_errors = format_with_ruff(code, unique_path)
-    item["text_formatted"] = formatted
+    item[output_key] = formatted
     item["lint_report"] = format_errors
 
     return item
