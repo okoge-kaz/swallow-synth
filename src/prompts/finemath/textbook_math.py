@@ -93,7 +93,11 @@ Step-by-step solution:
    First root: $x_1 = \frac{3 + 5}{2} = \frac{8}{2} = 4$
    Second root: $x_2 = \frac{3 - 5}{2} = \frac{-2}{2} = -1$
 
-Thus, the solutions are $x = 4$ and $x = -1$. These can be verified by substituting back into the original equation: For $x=4$, $16 - 12 - 4 = 0$; for $x=-1$, $1 + 3 - 4 = 0$.
+Thus, the solutions are $x = 4$ and $x = -1$.
+
+These can be verified by substituting back into the original equation: For $x=4$, $16 - 12 - 4 = 0$; for $x=-1$, $1 + 3 - 4 = 0$.
+
+Solutions: $x = 4$ and $x = -1$.
 ```
 
 Ensure the output is formatted in LaTeX and placed after `<|MATH_TEXT|>`.

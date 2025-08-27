@@ -54,6 +54,8 @@ $$
 \text{dot-product} = (2 \cdot 1) + (4 \cdot 3) + (6 \cdot 5) = 2 + 12 + 30 = 44
 $$
 
+So, Answer is: 44
+
 **Code Implementation 1**:
 ```python
 def dot_product(lst1, lst2):
@@ -75,6 +77,8 @@ The `map-combine` function applies an element-wise function (multiplication, $$*
 $$
 \text{map-combine}(0, *, +, [1, 3, 4], [5, 7, 8]) = (1 \cdot 5) + (3 \cdot 7) + (4 \cdot 8) = 5 + 21 + 32 = 58
 $$
+
+So, Answer is: 58
 
 **Code Implementation 2**:
 ```python
