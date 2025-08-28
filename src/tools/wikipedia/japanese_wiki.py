@@ -158,6 +158,10 @@ def process(example: Dict) -> Dict:
         for section in sections if section['text']
     )
 
+    # Append a single newline if all_text is not empty
+    if all_text:
+        all_text += "\n"
+
     return {
         "text": all_text,
         "sections": sections
