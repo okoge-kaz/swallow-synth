@@ -105,11 +105,11 @@ def mapping_jsonl(example: Dict) -> Dict:
             section_title = section.h2.text  # type: ignore
 
         for tag in section.find_all(TAGS_TO_REMOVE):  # type: ignore
-            tag.clear()
+            tag.clear()  # type: ignore
 
         for tag in section.find_all(TAGS_TO_EXTRACT):  # type: ignore
-            for inner_tag in tag.find_all(INNER_TAGS_TO_REMOVE):
-                inner_tag.clear()
+            for inner_tag in tag.find_all(INNER_TAGS_TO_REMOVE):  # type: ignore
+                inner_tag.clear()  # type: ignore
 
             paragraph_text = normalize_text(tag.text)
 
@@ -122,7 +122,7 @@ def mapping_jsonl(example: Dict) -> Dict:
                 {
                     "title": current_title,
                     "text": paragraph_text,
-                    "tag": tag.name,
+                    "tag": tag.name,  # type: ignore
                     "paragraph_id": paragraph_id,
                 }
             )
@@ -153,7 +153,10 @@ def process(example: Dict) -> Dict:
         })
 
     # Combine all section texts for the 'text' field
-    all_text = "\n\n".join(f"## {section['title']}\n\n{section['text']}" for section in sections if section['text'])
+    all_text = "\n\n".join(
+        f"## {section['title']}\n\n{section['text']}" if section['title'] else section['text']
+        for section in sections if section['text']
+    )
 
     return {
         "text": all_text,
@@ -192,7 +195,7 @@ def main():
     dataset = dataset.filter(  # type: ignore
         lambda x: x["html"] is not None,
         num_proc=args.num_proc,  # type: ignore
-        desc="Filtering HTML"
+        desc="Filtering HTML"  # type: ignore
     )  # type: ignore
     print(f"Filtering HTML took {time.time() - filter_html_start:.2f} seconds")
 
