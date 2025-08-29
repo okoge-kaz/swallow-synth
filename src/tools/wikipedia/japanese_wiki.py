@@ -146,26 +146,20 @@ def process(example: Dict) -> Dict:
     sections = []
     for section_id, (title, texts) in enumerate(section_dict.items()):
         combined_text = "\n\n".join(text for text in texts if text)
-        sections.append({
-            "section_id": section_id,
-            "title": title,
-            "text": combined_text
-        })
+        sections.append({"section_id": section_id, "title": title, "text": combined_text})
 
     # Combine all section texts for the 'text' field
     all_text = "\n\n".join(
-        f"## {section['title']}\n\n{section['text']}" if section['title'] else section['text']
-        for section in sections if section['text']
+        f"## {section['title']}\n\n{section['text']}" if section["title"] else section["text"]
+        for section in sections
+        if section["text"]
     )
 
     # Append a single newline if all_text is not empty
     if all_text:
         all_text += "\n"
 
-    return {
-        "text": all_text,
-        "sections": sections
-    }
+    return {"text": all_text, "sections": sections}
 
 
 def save_to_jsonl(dataset: ds.Dataset, output_file: str):
@@ -199,7 +193,7 @@ def main():
     dataset = dataset.filter(  # type: ignore
         lambda x: x["html"] is not None,
         num_proc=args.num_proc,  # type: ignore
-        desc="Filtering HTML"  # type: ignore
+        desc="Filtering HTML",  # type: ignore
     )  # type: ignore
     print(f"Filtering HTML took {time.time() - filter_html_start:.2f} seconds")
 
@@ -207,29 +201,20 @@ def main():
     filter_disambig_start = time.time()
     if not args.include_disambiguation_page:
         dataset = dataset.filter(
-            lambda x: not x["is_disambiguation_page"],
-            num_proc=args.num_proc,
-            desc="Filtering disambiguation pages"
+            lambda x: not x["is_disambiguation_page"], num_proc=args.num_proc, desc="Filtering disambiguation pages"
         )  # type: ignore
     print(f"Filtering disambiguation pages took {time.time() - filter_disambig_start:.2f} seconds")
 
     # Map HTML to paragraphs
     map_start = time.time()
     dataset = dataset.map(
-        mapping_jsonl,
-        remove_columns=["html"],
-        num_proc=args.num_proc,
-        desc="Mapping HTML to paragraphs"
+        mapping_jsonl, remove_columns=["html"], num_proc=args.num_proc, desc="Mapping HTML to paragraphs"
     )
     print(f"Mapping HTML to paragraphs took {time.time() - map_start:.2f} seconds")
 
     # Process paragraphs to text and sections
     process_start = time.time()
-    dataset = dataset.map(
-        process,
-        num_proc=args.num_proc,
-        desc="Processing paragraphs"
-    )
+    dataset = dataset.map(process, num_proc=args.num_proc, desc="Processing paragraphs")
     print(f"Processing paragraphs took {time.time() - process_start:.2f} seconds")
 
     # Sort and select columns

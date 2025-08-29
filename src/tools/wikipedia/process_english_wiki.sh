@@ -20,6 +20,6 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-python src/tools/wikipedia/english_wiki.py \
-  --input-dir /groups/gag51395/datasets/raw/pretrain/wikipedia/raw/en_wiki \
-  --output-file /groups/gag51395/datasets/raw/pretrain/wikipedia/processed/en_wikipedia.jsonl
+python src/tools/wikipedia/japanese_wiki.py \
+  --input-dir /groups/gag51395/datasets/raw/pretrain/wikipedia/raw/ja_wiki \
+  --output-file /groups/gag51395/datasets/raw/pretrain/wikipedia/processed/ja_wikipedia_multi_process.jsonl
