@@ -12,7 +12,7 @@ def extract_and_format_text(raw_text):
     # Check for <|MATH_TEXT|>
     math_marker = "<|MATH_TEXT|>"
     if math_marker in raw_text:
-        return raw_text.split(math_marker, 1)[1].strip()
+        return raw_text.rsplit(math_marker, 1)[-1].strip()
 
     # Check for <think> and </think>
     think_start = "<think>"

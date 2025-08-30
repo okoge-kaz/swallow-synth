@@ -2,7 +2,7 @@
 #PBS -q rt_HF
 #PBS -N math_stage2
 #PBS -l select=1
-#PBS -l walltime=6:00:00
+#PBS -l walltime=24:00:00
 #PBS -j oe
 #PBS -m n
 #PBS -v USE_SSH=1
@@ -25,8 +25,8 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-INPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/stage1/"
-OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/stage2"
+INPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-math-v2/textbook-style"
+OUTPUT_DIR="$INPUT_DIR/filtered"
 mkdir -p $OUTPUT_DIR
 
 uv run python src/tools/finemath/filter_finemath.py \
