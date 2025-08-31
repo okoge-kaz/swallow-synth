@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -q rt_HG
+#PBS -q rt_HC
 #PBS -N stage6
 #PBS -l select=1:ncpus=32
 #PBS -l walltime=72:00:00
@@ -29,10 +29,10 @@ fi
 INDEX=$(printf "%04d" $INDEX)
 QUALITY=medium
 
-INPUT_FILE=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python/train_${INDEX}_${QUALITY}_Qwen3-235B-A22B-Instruct-2507.jsonl
-OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/python/${QUALITY}_quality
+INPUT_FILE=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage5/python/Qwen3-235B-A22B-Instruct-2507-FP8/${QUALITY}/train_${INDEX}.jsonl
+OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/python/${QUALITY}_quality/Qwen3-235B-A22B-Instruct-2507-FP8
 
-OUTPUT_FILE=${OUTPUT_FILE_DIR}/train_${INDEX}_${QUALITY}_Qwen3-235B-A22B-Instruct-2507.jsonl
+OUTPUT_FILE=${OUTPUT_FILE_DIR}/train_${INDEX}.jsonl
 mkdir -p $OUTPUT_FILE_DIR
 
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"

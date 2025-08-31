@@ -2,7 +2,7 @@
 #PBS -q rt_HF
 #PBS -N stage5
 #PBS -l select=1
-#PBS -l walltime=60:00:00
+#PBS -l walltime=72:00:00
 #PBS -j oe
 #PBS -m n
 #PBS -v USE_SSH=1
@@ -28,7 +28,7 @@ if [ "$INDEX_INT" -lt 0 ] || [ "$INDEX_INT" -gt 162 ]; then
   echo "Error: INDEX must be in [0,162], got $INDEX_INT"
   exit 1
 fi
-OTHER_INT=$((163 - INDEX_INT))
+OTHER_INT=$((INDEX_INT + 1))
 
 module load cuda/12.6/12.6.1
 
