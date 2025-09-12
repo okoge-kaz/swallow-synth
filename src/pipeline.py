@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 import os
@@ -25,14 +26,14 @@ def get_process_item_cpu(lang: str) -> Callable:
 
 
 def get_rewrite_pipeline(
-    lang: str, model_name: str, tensor_parallel_size: int = 1, model_max_length: int = 131072
+    lang: str, model_name: str, tensor_parallel_size: int = 1, model_max_length: int = 131072, use_async=False
 ) -> RewritePipeline:
     pipelines = {
         "python": PythonRewritePipeline,
     }
     if lang not in pipelines:
         raise ValueError(f"Unsupported language: {lang}")
-    return pipelines[lang](model_name, tensor_parallel_size, model_max_length)
+    return pipelines[lang](model_name, tensor_parallel_size, model_max_length, use_async)
 
 
 def process_chunk_to_file(args):
@@ -83,6 +84,22 @@ def stream_jsonl(file_path: Path, batch_size: int = 1024) -> Iterator[list[dict[
                 batch = []
         if batch:  # return remaining data
             yield batch
+
+
+def stream_jsonl_(file_path: Path) -> Iterator[dict[str, Any]]:
+    """Yield one JSON object (dict) per non-blank line from a UTF-8 .jsonl file."""
+    with file_path.open("r", encoding="utf-8") as fin:
+        for i, raw in enumerate(fin, start=1):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"JSON parse error at line {i}: {e.msg}") from e
+            if not isinstance(obj, dict):
+                raise TypeError(f"Expected a JSON object at line {i}, got {type(obj).__name__}")
+            yield obj
 
 
 def split_into_chunks(items: list, n_workers: int) -> list[list]:
@@ -211,7 +228,7 @@ def llm_rewrite(
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     pipeline = get_rewrite_pipeline(
-        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length, use_async=True
     )
 
     total_items = 0
@@ -220,29 +237,23 @@ def llm_rewrite(
     print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
 
     with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
-        for batch in stream_jsonl(input_path, batch_size):
-            total_items += len(batch)
-            print(f"Processing batch of {len(batch)} items...")
+        async def _consume() -> None:
+            # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
+            async for ev in pipeline.rewrite_codes(stream_jsonl_(input_path), prompt_type=prompt_type):
+                if "error" not in ev:
+                    item = {}
+                    improved_text = ev["result"]
+                    improved_code = extract_rewritten_code(improved_text)
+                    item["improved_text"] = improved_text
+                    item["improved_code"] = improved_code
 
-            # key in batch should be "text_formatted" for rewriting
-            if not all("text_formatted" in item for item in batch):
-                raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
-            codes = [item.get("text_formatted", "") for item in batch]
-
-            # Call pipeline.rewrite_codes with specified prompt type
-            try:
-                rewritten_texts = pipeline.rewrite_codes(codes, prompt_type=prompt_type)
-
-                # Write results to output file
-                for index, item in enumerate(batch):
-                    rewritten_text = rewritten_texts[index] if index < len(rewritten_texts) else ""
-                    rewritten_code = extract_rewritten_code(rewritten_text)
-                    item["improved_text"] = rewritten_text
-                    item["improved_code"] = rewritten_code
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+                    fout.flush()  # ensure truly streaming writes
 
-            except Exception as e:
-                print(f"Error during rewriting: {e}")
+                nonlocal total_items
+                total_items += 1
+
+        asyncio.run(_consume())
 
     actual_time = time.time() - start_time
     print(f"LLM rewriting completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
@@ -389,7 +400,7 @@ def llm_auto_fix(
 
     # Write initial statistics
     with stats_path.open("w", encoding="utf-8") as fout:
-        fout.write(f"Initial statistics:\n")
+        fout.write("Initial statistics:\n")
         fout.write(f"Total items: {len(with_errors_data) + len(without_errors_data)}\n")
         fout.write(f"Without errors: {len(without_errors_data)}\n")
         fout.write(f"With errors: {len(with_errors_data)}\n\n")
@@ -519,7 +530,7 @@ def llm_auto_fix(
 
             # Update statistics
             with stats_path.open("a", encoding="utf-8") as fout:
-                fout.write(f"After error fixing:\n")
+                fout.write("After error fixing:\n")
                 fout.write(f"Items processed for fixing: {len(filtered_data)}\n")
                 fout.write(f"Items skipped due to length: {skipped_count}\n")
                 fout.write(f"Successfully fixed: {len(newly_fixed)}\n")
@@ -724,7 +735,7 @@ def after_rewrite_filter(
         total_stats["total_errors"] += result["error_items"]
 
     # Print final statistics
-    print(f"After-rewrite filtering completed:")
+    print("After-rewrite filtering completed:")
     print(f"  Total items processed: {total_stats['total_items']}")
     print(f"  Clean items (saved): {total_stats['total_filtered']}")
     print(f"  Items filtered out: {total_stats['total_errors']}")
