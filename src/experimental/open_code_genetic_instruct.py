@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -121,7 +120,7 @@ def main():
     output_file = output_dir / args.output_file
     save_processed_data(all_processed_data, output_file)
 
-    print(f"\nProcessing complete!")
+    print("\nProcessing complete!")
     print(f"  Total processed entries: {total_processed}")
     print(f"  Output saved to: {output_file}")
 
