@@ -73,7 +73,7 @@ def process_jsonl_file(input_file, output_file):
                 continue
 
     # 処理結果の表示
-    print(f"処理完了:")
+    print("処理完了:")
     print(f"  - 処理済み (judgement=='right'): {processed_count}行")
     print(f"  - フィルタされた (judgement!='right'): {filtered_count}行")
     print(f"  - エラー: {error_count}行")
