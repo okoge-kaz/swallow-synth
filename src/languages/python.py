@@ -121,7 +121,7 @@ class PythonRewritePipeline(RewritePipeline):
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    async def run_request(self, engine, prompt, sampling_params, request_id):
+    async def run_request(self, engine, item, prompt, sampling_params, request_id):
         async for output in engine.generate(
             request_id=request_id, prompt=prompt, sampling_params=sampling_params
         ):
@@ -130,7 +130,7 @@ class PythonRewritePipeline(RewritePipeline):
                 in_toks = len(output.prompt_token_ids or [])
                 # output tokens
                 out_toks = sum(len(stp.token_ids) for stp in output.outputs)
-                return request_id, output.outputs[0].text, in_toks, out_toks
+                return request_id, item, output.outputs[0].text, in_toks, out_toks
 
     def generate(self, prompts: list[str]) -> list[str]:
         # Greedy / deterministic inference
@@ -196,10 +196,12 @@ class PythonRewritePipeline(RewritePipeline):
         total_in = 0
         total_out = 0
 
-        async def make_task(code: str, prompt_type) -> None | asyncio.Task:
+        async def make_task(item: dict[str, any], prompt_type) -> None | asyncio.Task:
             nonlocal produced
             rid = f"req-{produced}"
             produced += 1
+
+            code = item.get("text_formatted", "")
 
             # Select prompt based on prompt_type
             if prompt_type == "stage5":
@@ -222,7 +224,7 @@ class PythonRewritePipeline(RewritePipeline):
             max_len = len(self.tokenizer.encode(prompt))
             sampling_params = SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len)
 
-            return asyncio.create_task(self.run_request(self.engine, prompt, sampling_params, rid))
+            return asyncio.create_task(self.run_request(self.engine, item, prompt, sampling_params, rid))
 
         start = time.perf_counter()
 
@@ -234,7 +236,7 @@ class PythonRewritePipeline(RewritePipeline):
                 break
             if "text_formatted" not in item:
                 raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
-            pending.add(await make_task(item.get("text_formatted", ""), prompt_type))
+            pending.add(await make_task(item, prompt_type))
 
         # As tasks complete, schedule new ones until inputs exhausted
         while pending:
@@ -242,12 +244,13 @@ class PythonRewritePipeline(RewritePipeline):
             for task in done:
                 consumed += 1
                 try:
-                    request_id, result, in_tokens, out_tokens = task.result()
+                    request_id, item, result, in_tokens, out_tokens = task.result()
                     total_in += in_tokens
                     total_out += out_tokens
                     elapsed = time.perf_counter() - start
                     print(f"Output tokens/sec: {total_out/elapsed:.2f}")
                     yield {
+                        "item": item,
                         "result": result
                     }
                 except Exception as e:
@@ -264,7 +267,7 @@ class PythonRewritePipeline(RewritePipeline):
                 if item is not None:
                     if "text_formatted" not in item:
                         raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
-                    pending.add(await make_task(item.get("text_formatted", ""), prompt_type))
+                    pending.add(await make_task(item, prompt_type))
 
 
     def competitive_programming_write(self, questions: List[str]) -> List[str]:
