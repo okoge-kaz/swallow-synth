@@ -201,6 +201,8 @@ class PythonRewritePipeline(RewritePipeline):
             rid = f"req-{produced}"
             produced += 1
 
+            if "text_formatted" not in item:
+                raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
             code = item.get("text_formatted", "")
 
             # Select prompt based on prompt_type
@@ -234,8 +236,6 @@ class PythonRewritePipeline(RewritePipeline):
                 item = next(code_iterator)
             except StopIteration:
                 break
-            if "text_formatted" not in item:
-                raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
             pending.add(await make_task(item, prompt_type))
 
         # As tasks complete, schedule new ones until inputs exhausted
@@ -265,8 +265,6 @@ class PythonRewritePipeline(RewritePipeline):
                 except StopIteration:
                     item = None
                 if item is not None:
-                    if "text_formatted" not in item:
-                        raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
                     pending.add(await make_task(item, prompt_type))
 
 
