@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Dict, Any, Generator, List
@@ -83,7 +82,7 @@ def merge_jsonl_files(input_dir: Path, output_file: Path, key: str, min_length: 
 
                 print(f"  - Total lines: {file_lines}, Valid lines: {file_valid_lines}")
 
-        print(f"\nProcessing completed!")
+        print("\nProcessing completed!")
         print(f"Total processed lines: {total_lines}")
         print(f"Valid lines: {valid_lines}")
         print(f"Output file: {output_file}")

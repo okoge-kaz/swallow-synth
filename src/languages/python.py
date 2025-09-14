@@ -1,11 +1,15 @@
 import ast
+import asyncio
 import subprocess
 import tempfile
+import time
 import uuid
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Iterator, AsyncIterator
 
 from vllm import LLM, SamplingParams
+from vllm.engine.arg_utils import AsyncEngineArgs
+from vllm.v1.engine.async_llm import AsyncLLM
 from transformers import AutoTokenizer
 from src.prompts.python.stage2 import PYTHON_STAGE2_PROMPT
 from src.prompts.python.stage4 import PYTHON_STAGE4_PROMPT
@@ -87,19 +91,46 @@ def process_item_cpu(item: Dict[str, Any], key: str = "text", output_key: str = 
 
 
 class PythonRewritePipeline(RewritePipeline):
-    def __init__(self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960) -> None:
+    def __init__(self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960, use_async=False) -> None:
         self.model_name = model_name
         self.tensor_parallel_size = tensor_parallel_size
         self.max_model_len = max_model_len
 
-        self.llm = LLM(
-            model=model_name,
-            tensor_parallel_size=tensor_parallel_size,
-            gpu_memory_utilization=0.95,
-            max_model_len=max_model_len,
-        )
+        if use_async:
+            engine_args = AsyncEngineArgs(
+                model=model_name,
+                max_num_seqs=512,  # H200 141GB SXM5 HBM3e x 8
+                task="generate",
+                enable_prefix_caching=True,
+                enforce_eager=True,
+                async_scheduling=True,
+                enable_chunked_prefill=True,
+                tensor_parallel_size=tensor_parallel_size,
+                gpu_memory_utilization=0.95,
+                max_model_len=max_model_len,
+            )
+            self.engine = AsyncLLM.from_engine_args(engine_args)
+        else:
+            self.llm = LLM(
+                model=model_name,
+                max_num_seqs=512,
+                tensor_parallel_size=tensor_parallel_size,
+                gpu_memory_utilization=0.95,
+                max_model_len=max_model_len,
+            )
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    async def run_request(self, engine, prompt, sampling_params, request_id):
+        async for output in engine.generate(
+            request_id=request_id, prompt=prompt, sampling_params=sampling_params
+        ):
+            if output.finished:
+                # input tokens
+                in_toks = len(output.prompt_token_ids or [])
+                # output tokens
+                out_toks = sum(len(stp.token_ids) for stp in output.outputs)
+                return request_id, output.outputs[0].text, in_toks, out_toks
 
     def generate(self, prompts: list[str]) -> list[str]:
         # Greedy / deterministic inference
@@ -155,19 +186,29 @@ class PythonRewritePipeline(RewritePipeline):
         outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
         return [output.outputs[0].text for output in outputs]  # type: ignore
 
-    def rewrite_codes(self, codes: list[str], prompt_type: str = "stage5") -> list[str]:
+    async def rewrite_codes(self, code_iterator: Iterator[dict[str, Any]], prompt_type: str = "stage5") -> AsyncIterator[Dict[str, Any]]:
         # Construct chat templates for batch processing
-        prompts: list[str] = []
+        pending = set()
+        produced = 0
+        consumed = 0
+        max_in_flight = 2048
 
-        # Select prompt based on prompt_type
-        if prompt_type == "stage5":
-            PROMPT = PYTHON_STAGE5_REWRITE_PROMPT
-        elif prompt_type == "stage8":
-            PROMPT = PYTHON_STAGE8_REWRITE_PROMPT
-        else:
-            raise ValueError(f"Unsupported prompt_type: {prompt_type}. Supported types: 'stage5', 'stage8'")
+        total_in = 0
+        total_out = 0
 
-        for code in codes:
+        async def make_task(code: str, prompt_type) -> None | asyncio.Task:
+            nonlocal produced
+            rid = f"req-{produced}"
+            produced += 1
+
+            # Select prompt based on prompt_type
+            if prompt_type == "stage5":
+                PROMPT = PYTHON_STAGE5_REWRITE_PROMPT
+            elif prompt_type == "stage8":
+                PROMPT = PYTHON_STAGE8_REWRITE_PROMPT
+            else:
+                raise ValueError(f"Unsupported prompt_type: {prompt_type}. Supported types: 'stage5', 'stage8'")
+
             prompt = (
                 "<|im_start|>system\n"
                 + PROMPT
@@ -177,17 +218,54 @@ class PythonRewritePipeline(RewritePipeline):
                 + "<|im_end|>\n"
                 + "<|im_start|>assistant\n"
             )
-            prompts.append(prompt)
 
-        tokenized_prompts_len = [len(self.tokenizer.encode(prompt)) for prompt in prompts]
-        max_len = max(tokenized_prompts_len)
-        if max_len >= self.max_model_len:
-            raise ValueError(
-                f"Prompt length exceeds model limit: {max_len} >= {self.max_model_len}. "
-                "Consider reducing the input size or using a smaller model."
-            )
-        outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
-        return [output.outputs[0].text for output in outputs]  # type: ignore
+            max_len = len(self.tokenizer.encode(prompt))
+            sampling_params = SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len)
+
+            return asyncio.create_task(self.run_request(self.engine, prompt, sampling_params, rid))
+
+        start = time.perf_counter()
+
+        # Prime the pipeline up to max_in_flight
+        for _ in range(max_in_flight):
+            try:
+                item = next(code_iterator)
+            except StopIteration:
+                break
+            if "text_formatted" not in item:
+                raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
+            pending.add(await make_task(item.get("text_formatted", ""), prompt_type))
+
+        # As tasks complete, schedule new ones until inputs exhausted
+        while pending:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                consumed += 1
+                try:
+                    request_id, result, in_tokens, out_tokens = task.result()
+                    total_in += in_tokens
+                    total_out += out_tokens
+                    elapsed = time.perf_counter() - start
+                    print(f"Output tokens/sec: {total_out/elapsed:.2f}")
+                    yield {
+                        "result": result
+                    }
+                except Exception as e:
+                    print(f"[task-error] {e!r}")
+                    yield {
+                        "error": f"[swallow-code] [task-error] {e!r}"
+                    }
+
+                # Refill
+                try:
+                    item = next(code_iterator)
+                except StopIteration:
+                    item = None
+                if item is not None:
+                    if "text_formatted" not in item:
+                        raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
+                    pending.add(await make_task(item.get("text_formatted", ""), prompt_type))
+
 
     def competitive_programming_write(self, questions: List[str]) -> List[str]:
         # Construct chat templates for batch processing

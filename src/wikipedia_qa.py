@@ -3,7 +3,6 @@ import json
 import os
 from typing import cast, Dict, List, Union
 from vllm import LLM, SamplingParams
-import torch
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 
