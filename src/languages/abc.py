@@ -66,15 +66,3 @@ class RewritePipeline(ABC):
             list[str]: The rewritten code snippets.
         """
         raise NotImplementedError("This method should be implemented by subclasses.")
-
-    def competitive_programming_write(self, questions: list[str]) -> list[str]:
-        """
-        Write competitive programming solutions based on the provided questions.
-
-        Args:
-            questions (list[str]): The list of competitive programming questions.
-
-        Returns:
-            list[str]: The solutions to the competitive programming questions.
-        """
-        raise NotImplementedError("This method should be implemented by subclasses.")
