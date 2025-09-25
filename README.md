@@ -87,7 +87,22 @@
 git clone git@github.com:rioyokotalab/swallow-code-v2.git
 cd swallow-code-v2
 
+
+# vLLM bakcend
+# Currently supports: Python stage 2, 4, 5, 6
 uv sync
+
+# TensorRT-LLM backend
+# Currently supports: Python stage 2, 4, 5
+module load cuda/12.8/12.8.1
+module load gcc
+
+python -m venv .trt
+source .trt/bin/activate
+uv pip install -r requirements.txt
+uv pip install torch==2.7.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+uv pip install tensorrt_llm==1.1.0rc5
+uv pip install mpi4py openmpi
 ```
 
 ### Dependencies
