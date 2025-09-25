@@ -20,11 +20,13 @@ try:
     from vllm import LLM, SamplingParams
     from vllm.engine.arg_utils import AsyncEngineArgs
     from vllm.v1.engine.async_llm import AsyncLLM
+
     backend = "vllm"
 except ImportError:
     try:
         from tensorrt_llm import LLM, SamplingParams
         from tensorrt_llm.llmapi import CudaGraphConfig, KvCacheConfig
+
         backend = "tensorrt_llm"
     except ImportError as e:
         raise ImportError(e)
@@ -118,7 +120,9 @@ def make_list(end: int):
 
 
 class PythonRewritePipeline(RewritePipeline):
-    def __init__(self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960, use_async=False) -> None:
+    def __init__(
+        self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960, use_async=False
+    ) -> None:
         self.model_name = model_name
         self.tensor_parallel_size = tensor_parallel_size
         self.max_model_len = max_model_len
@@ -173,9 +177,7 @@ class PythonRewritePipeline(RewritePipeline):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     async def run_request(self, engine, item, prompt, sampling_params, request_id):
-        async for output in engine.generate(
-            request_id=request_id, prompt=prompt, sampling_params=sampling_params
-        ):
+        async for output in engine.generate(request_id=request_id, prompt=prompt, sampling_params=sampling_params):
             if output.finished:
                 # input tokens
                 in_toks = len(output.prompt_token_ids or [])
@@ -237,7 +239,9 @@ class PythonRewritePipeline(RewritePipeline):
         outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
         return [output.outputs[0].text for output in outputs]  # type: ignore
 
-    async def rewrite_codes(self, code_iterator: Iterator[dict[str, Any]], prompt_type: str = "stage5") -> AsyncIterator[Dict[str, Any]]:
+    async def rewrite_codes(
+        self, code_iterator: Iterator[dict[str, Any]], prompt_type: str = "stage5"
+    ) -> AsyncIterator[Dict[str, Any]]:
         # Construct chat templates for batch processing
         pending = set()
         produced = 0
@@ -299,16 +303,11 @@ class PythonRewritePipeline(RewritePipeline):
                     total_in += in_tokens
                     total_out += out_tokens
                     elapsed = time.perf_counter() - start
-                    print(f"Output tokens/sec: {total_out/elapsed:.2f}")
-                    yield {
-                        "item": item,
-                        "result": result
-                    }
+                    print(f"Output tokens/sec: {total_out / elapsed:.2f}")
+                    yield {"item": item, "result": result}
                 except Exception as e:
                     print(f"[task-error] {e!r}")
-                    yield {
-                        "error": f"[swallow-code] [task-error] {e!r}"
-                    }
+                    yield {"error": f"[swallow-code] [task-error] {e!r}"}
 
                 # Refill
                 try:
@@ -317,7 +316,6 @@ class PythonRewritePipeline(RewritePipeline):
                     item = None
                 if item is not None:
                     pending.add(await make_task(item, prompt_type))
-
 
     def competitive_programming_write(self, questions: List[str]) -> List[str]:
         # Construct chat templates for batch processing

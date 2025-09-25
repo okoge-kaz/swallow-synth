@@ -10,8 +10,7 @@ def clean_generated_solution(solution: str) -> str:
 
 
 def process_file(input_file: Path, output_file: Path) -> None:
-    with open(input_file, "r", encoding="utf-8") as infile, \
-         open(output_file, "a", encoding="utf-8") as outfile:
+    with open(input_file, "r", encoding="utf-8") as infile, open(output_file, "a", encoding="utf-8") as outfile:
         for line_num, line in enumerate(infile, 1):
             line = line.strip()
             if not line:
@@ -41,10 +40,8 @@ def process_file(input_file: Path, output_file: Path) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Process cot-*.jsonl files")
-    parser.add_argument("--input-dir", type=Path, required=True,
-                        help="Directory containing cot-*.jsonl files")
-    parser.add_argument("--output-jsonl", type=Path, required=True,
-                        help="Output JSONL file path")
+    parser.add_argument("--input-dir", type=Path, required=True, help="Directory containing cot-*.jsonl files")
+    parser.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file path")
     args = parser.parse_args()
 
     input_files = sorted(args.input_dir.glob("cot-*.jsonl"))

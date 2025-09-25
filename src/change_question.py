@@ -3,7 +3,6 @@ import json
 import os
 from typing import Dict, List, Union
 from vllm import LLM, SamplingParams
-import torch
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 # Define the competitive programming prompt as a message structure for chat templates

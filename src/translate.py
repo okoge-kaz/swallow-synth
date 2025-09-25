@@ -1,9 +1,8 @@
 import argparse
 import json
 import os
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Union
 from vllm import LLM, SamplingParams
-import torch
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
 # Define the prompt templates for translating both question and code as message structures for chat templates
@@ -194,37 +193,26 @@ def parse_args() -> argparse.Namespace:
         "--input-jsonl",
         type=str,
         required=True,
-        help="Path to input JSONL file containing dictionaries with 'question' and 'answer' keys."
+        help="Path to input JSONL file containing dictionaries with 'question' and 'answer' keys.",
     )
     parser.add_argument(
         "--output-jsonl",
         type=str,
         required=True,
-        help="Path to output JSONL file where translated results will be saved."
+        help="Path to output JSONL file where translated results will be saved.",
     )
+    parser.add_argument("--model-path", type=str, required=True, help="Path to the vLLM model directory.")
     parser.add_argument(
-        "--model-path",
-        type=str,
-        required=True,
-        help="Path to the vLLM model directory."
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=4096,
-        help="Number of JSONL lines to process in each batch (default: 4096)."
+        "--batch-size", type=int, default=4096, help="Number of JSONL lines to process in each batch (default: 4096)."
     )
     parser.add_argument(
         "--gen-max-tokens",
         type=int,
         default=16384,
-        help="Maximum number of tokens for generated output (default: 16384)."
+        help="Maximum number of tokens for generated output (default: 16384).",
     )
     parser.add_argument(
-        "--tensor-parallel-size",
-        type=int,
-        default=1,
-        help="Tensor parallel size for vLLM model (default: 1)."
+        "--tensor-parallel-size", type=int, default=1, help="Tensor parallel size for vLLM model (default: 1)."
     )
     return parser.parse_args()
 

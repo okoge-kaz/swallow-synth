@@ -14,10 +14,12 @@ from src.languages.abc import RewritePipeline
 
 try:
     from vllm import LLM, SamplingParams
+
     backend = "vllm"
 except ImportError:
     try:
         from tensorrt_llm import LLM, SamplingParams
+
         backend = "tensorrt_llm"
     except ImportError:
         backend = None
