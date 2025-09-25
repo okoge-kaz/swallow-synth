@@ -89,11 +89,11 @@ cd swallow-code-v2
 
 
 # vLLM bakcend
-# Currently supports: Python stage 2, 4, 5, 6
+# Currently supports: Python stage 2, 4, 5, 8
 uv sync
 
 # TensorRT-LLM backend
-# Currently supports: Python stage 2, 4, 5
+# Currently supports: Python stage 2, 4
 module load cuda/12.8/12.8.1
 module load gcc
 
