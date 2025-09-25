@@ -13,6 +13,10 @@
 set -e
 cd $PBS_O_WORKDIR
 
+# Load required modules
+module load cuda/12.8/12.8.1
+module load gcc
+
 # Check if INDEX is provided
 if [ -z "$INDEX" ]; then
   echo "Error: INDEX variable is not set"
