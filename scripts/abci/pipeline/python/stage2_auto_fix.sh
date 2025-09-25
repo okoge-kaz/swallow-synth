@@ -28,7 +28,7 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-source .venv/bin/activate
+source ./.trt/bin/activate
 
 INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage1/python/train_${INDEX}.jsonl"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage2/python"
@@ -37,10 +37,12 @@ mkdir -p $OUTPUT_DIR
 export CUDA_VISIBLE_DEVICES=0
 export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-uv run python src/pipeline.py llm_auto_fix \
+
+mpirun --oversubscribe -np 1 python src/pipeline.py llm_auto_fix \
   --input-jsonl $INPUT_FILE_PATH \
   --output-dir $OUTPUT_DIR \
   --model "/groups/gag51395/hf_checkpoints/Qwen3-30B-A3B" \
+  --model-max-length 32768 \
   --lang python \
   --batch-size 1024 \
   --tensor-parallel-size 1

@@ -16,6 +16,10 @@ cd $PBS_O_WORKDIR
 echo "Nodes allocated to this job:"Add commentMore actions
 cat $PBS_NODEFILE
 
+# Load required modules
+module load cuda/12.8/12.8.1
+module load gcc
+
 # Check if INDEX is provided
 if [ -z "$INDEX" ]; then
   echo "Error: INDEX variable is not set"
@@ -31,7 +35,7 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-source .venv/bin/activate
+source ./.trt/bin/activate
 
 INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage3/python/train_${INDEX}.jsonl"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python"
@@ -42,10 +46,12 @@ MODEL_NAME=Qwen3-14B
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-uv run python src/pipeline.py llm_scoring \
+
+mpirun --oversubscribe -np 1 python src/pipeline.py llm_scoring \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_DIR/train_${INDEX}_${MODEL_NAME}.jsonl \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
+  --model-max-length 32768 \
   --lang python \
   --batch-size 2048 \
   --tensor-parallel-size 8
