@@ -3,7 +3,6 @@ import time
 from pathlib import Path
 from typing import List
 
-from vllm import LLM, SamplingParams
 from transformers import AutoTokenizer
 from src.prompts.finemath.pretrain_math_text import PRE_TRAIN_MATH_TEXT
 from src.prompts.finemath.textbook_math import TEXT_BOOK_MATH_TEXT
@@ -13,6 +12,21 @@ from src.prompts.finemath.socratic_method import SOCRATIC_METHOD_PROMPT
 from src.prompts.finemath.multiple_solution import MULTIPLE_SOLUTION_PROMPT
 from src.languages.abc import RewritePipeline
 
+try:
+    from vllm import LLM, SamplingParams
+    backend = "vllm"
+except ImportError:
+    try:
+        from tensorrt_llm import LLM, SamplingParams
+        backend = "tensorrt_llm"
+    except ImportError:
+        backend = None
+
+if backend is None:
+    raise ImportError("Neither vllm nor tensorrt_llm is available.")
+else:
+    print(f"Using backend: {backend}")
+
 
 class FinemathRewritePipeline(RewritePipeline):
     def __init__(self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960) -> None:
@@ -20,10 +34,13 @@ class FinemathRewritePipeline(RewritePipeline):
         self.tensor_parallel_size = tensor_parallel_size
         self.max_model_len = max_model_len
 
+        if backend != "vllm":
+            raise RuntimeError("FinemathRewritePipeline only supports vLLM backend")
+
         self.llm = LLM(
             model=model_name,
             tensor_parallel_size=tensor_parallel_size,
-            gpu_memory_utilization=0.95,
+            gpu_memory_utilization=0.95,  # not supported in trt
             max_model_len=max_model_len,
         )
 
