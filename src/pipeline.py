@@ -240,7 +240,7 @@ def llm_rewrite(
             # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
             async for ev in pipeline.rewrite_codes(stream_jsonl_(input_path), prompt_type=prompt_type):
                 if "error" not in ev:
-                    item = {}
+                    item = ev["item"]
                     improved_text = ev["result"]
                     improved_code = extract_rewritten_code(improved_text)
                     item["improved_text"] = improved_text
