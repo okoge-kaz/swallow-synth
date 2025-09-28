@@ -313,6 +313,4 @@ class PythonRewritePipeline(RewritePipeline):
                 except StopIteration:
                     item = None
                 if item is not None:
-                    if "text_formatted" not in item:
-                        raise ValueError("All items in the batch must contain 'text_formatted' key for rewriting")
-                    pending.add(await make_task(item.get("text_formatted", ""), prompt_type))
+                    pending.add(await make_task(item, prompt_type))
