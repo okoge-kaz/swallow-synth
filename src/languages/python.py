@@ -7,15 +7,36 @@ import uuid
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Iterator, AsyncIterator
 
-from vllm import LLM, SamplingParams
-from vllm.engine.arg_utils import AsyncEngineArgs
-from vllm.v1.engine.async_llm import AsyncLLM
 from transformers import AutoTokenizer
 from src.prompts.python.stage2 import PYTHON_STAGE2_PROMPT
 from src.prompts.python.stage4 import PYTHON_STAGE4_PROMPT
 from src.prompts.python.stage5 import PYTHON_STAGE5_REWRITE_PROMPT
 from src.prompts.python.stage8 import PYTHON_STAGE8_REWRITE_PROMPT
 from src.languages.abc import RewritePipeline
+
+try:
+    from vllm import LLM, SamplingParams
+    from vllm.engine.arg_utils import AsyncEngineArgs
+    from vllm.v1.engine.async_llm import AsyncLLM
+
+    backend = "vllm"
+except ImportError:
+    try:
+        from tensorrt_llm import LLM, SamplingParams
+        from tensorrt_llm.llmapi import CudaGraphConfig, KvCacheConfig
+
+        backend = "tensorrt_llm"
+    except ImportError as e:
+        raise ImportError(e)
+        backend = None
+
+if backend is None:
+    raise ImportError("Neither vllm nor tensorrt_llm is available.")
+else:
+    print(f"Using backend: {backend}")
+
+
+# === CPU Stage: Syntax check, fast format (ruff), lint (ruff) ===
 
 
 def syntax_check(code: str) -> Tuple[bool, List[Dict[str, Any]]]:
@@ -87,13 +108,27 @@ def process_item_cpu(item: Dict[str, Any], key: str = "text", output_key: str = 
 # === GPU Stage: Style & Self-contained rewriting via local LLM (vLLM) + post-check ===
 
 
+def make_list(end: int):
+    out = [x for x in (1, 2, 4, 8) if x <= end]
+    v = 16
+    while v <= end:
+        out.append(v)
+        v += 8
+    return out
+
+
 class PythonRewritePipeline(RewritePipeline):
-    def __init__(self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960, use_async=False) -> None:
+    def __init__(
+        self, model_name: str = "qwen-3", tensor_parallel_size: int = 1, max_model_len: int = 40960, use_async=False
+    ) -> None:
         self.model_name = model_name
         self.tensor_parallel_size = tensor_parallel_size
         self.max_model_len = max_model_len
 
         if use_async:
+            if backend != "vllm":
+                raise RuntimeError("async execution requires vllm backend")
+
             engine_args = AsyncEngineArgs(
                 model=model_name,
                 max_num_seqs=512,  # H200 141GB SXM5 HBM3e x 8
@@ -108,20 +143,39 @@ class PythonRewritePipeline(RewritePipeline):
             )
             self.engine = AsyncLLM.from_engine_args(engine_args)
         else:
-            self.llm = LLM(
-                model=model_name,
-                max_num_seqs=512,
-                tensor_parallel_size=tensor_parallel_size,
-                gpu_memory_utilization=0.95,
-                max_model_len=max_model_len,
-            )
+            # sync and tensorrt-llm backend
+            if backend == "vllm":
+                self.llm = LLM(
+                    model=model_name,
+                    tensor_parallel_size=tensor_parallel_size,
+                    max_num_seqs=512,
+                    gpu_memory_utilization=0.95,
+                    max_model_len=max_model_len,
+                )
+            else:
+                self.llm = LLM(
+                    model=model_name,
+                    tensor_parallel_size=tensor_parallel_size,
+                    pipeline_parallel_size=1,
+                    max_seq_len=max_model_len,
+                    cuda_graph_config=CudaGraphConfig(
+                        batch_sizes=make_list(512),
+                        # batch_sizes=[1, 2, 4, 8, 16, 32, 48, 64, 128],
+                        enable_padding=True,
+                    ),
+                    max_num_tokens=max_model_len * 8,  # TODO reduce when OOM
+                    max_batch_size=512,
+                    kv_cache_config=KvCacheConfig(
+                        free_gpu_memory_fraction=0.9,
+                        enable_block_reuse=True,
+                    ),
+                    enable_chunked_prefill=True,
+                )
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     async def run_request(self, engine, item, prompt, sampling_params, request_id):
-        async for output in engine.generate(
-            request_id=request_id, prompt=prompt, sampling_params=sampling_params
-        ):
+        async for output in engine.generate(request_id=request_id, prompt=prompt, sampling_params=sampling_params):
             if output.finished:
                 # input tokens
                 in_toks = len(output.prompt_token_ids or [])
@@ -183,7 +237,9 @@ class PythonRewritePipeline(RewritePipeline):
         outputs = self.llm.generate(prompts, SamplingParams(temperature=0, max_tokens=self.max_model_len - max_len))
         return [output.outputs[0].text for output in outputs]  # type: ignore
 
-    async def rewrite_codes(self, code_iterator: Iterator[dict[str, Any]], prompt_type: str = "stage5") -> AsyncIterator[Dict[str, Any]]:
+    async def rewrite_codes(
+        self, code_iterator: Iterator[dict[str, Any]], prompt_type: str = "stage5"
+    ) -> AsyncIterator[Dict[str, Any]]:
         # Construct chat templates for batch processing
         pending = set()
         produced = 0
@@ -245,16 +301,11 @@ class PythonRewritePipeline(RewritePipeline):
                     total_in += in_tokens
                     total_out += out_tokens
                     elapsed = time.perf_counter() - start
-                    print(f"Output tokens/sec: {total_out/elapsed:.2f}")
-                    yield {
-                        "item": item,
-                        "result": result
-                    }
+                    print(f"Output tokens/sec: {total_out / elapsed:.2f}")
+                    yield {"item": item, "result": result}
                 except Exception as e:
                     print(f"[task-error] {e!r}")
-                    yield {
-                        "error": f"[swallow-code] [task-error] {e!r}"
-                    }
+                    yield {"error": f"[swallow-code] [task-error] {e!r}"}
 
                 # Refill
                 try:

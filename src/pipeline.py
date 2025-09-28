@@ -227,7 +227,11 @@ def llm_rewrite(
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     pipeline = get_rewrite_pipeline(
-        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length, use_async=True
+        lang=lang,
+        model_name=model_name,
+        tensor_parallel_size=tensor_parallel_size,
+        model_max_length=model_max_length,
+        use_async=True,
     )
 
     total_items = 0
@@ -236,6 +240,7 @@ def llm_rewrite(
     print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
 
     with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
+
         async def _consume() -> None:
             # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
             async for ev in pipeline.rewrite_codes(stream_jsonl_(input_path), prompt_type=prompt_type):

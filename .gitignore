@@ -130,6 +130,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.trt
 env/
 venv/
 ENV/
@@ -186,3 +187,4 @@ ruff_cache/
 # cluster
 outputs/
 hostfile/
+
