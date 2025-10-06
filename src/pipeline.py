@@ -16,7 +16,7 @@ from src.languages.python import (
 )
 from src.languages.abc import RewritePipeline
 from src.prompts import get_prompt
-from src.processor import CodeProcessor, score_processor_stage4, llm_rewrite_processor
+from src.processor import CodeProcessor, score_processor_stage4, llm_rewrite_processor, fix_errors_processor_stage2
 
 
 def get_process_item_cpu(lang: str) -> Callable:
@@ -249,7 +249,9 @@ def llm_rewrite(
 
         async def _consume() -> None:
             # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
-            async for ev in processor.process_code(stream_jsonl_(input_path), processor=rewrite_proc, max_in_flight=1024):
+            async for ev in processor.process_code(
+                stream_jsonl_(input_path), processor=rewrite_proc, max_in_flight=1024
+            ):
                 if "error" not in ev:
                     item = ev["item"]
                     improved_text = ev["result"]
@@ -310,6 +312,22 @@ def separate_code_samples(
     print(f"Separated {len(longer_samples)} longer samples and {len(samples)} regular samples")
 
 
+def extract_code_from_markdown(text: str, lang: str) -> str:
+    code_block_marker = f"```{lang}"
+    if code_block_marker in text:
+        start_marker = code_block_marker
+        end_marker = "```"
+        start_idx = text.find(start_marker)
+        if start_idx != -1:
+            code_start = start_idx + len(start_marker)
+            if code_start < len(text) and text[code_start] == "\n":
+                code_start += 1
+            end_idx = text.find(end_marker, code_start)
+            if end_idx != -1:
+                return text[code_start:end_idx].strip()
+    return text
+
+
 def llm_auto_fix(
     input_path: Path,
     output_dir: Path,
@@ -321,8 +339,18 @@ def llm_auto_fix(
 ) -> None:
     import re
 
-    pipeline = get_rewrite_pipeline(
-        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+    template = get_prompt("stage2", lang)
+    fix_proc = partial(
+        fix_errors_processor_stage2,
+        code_key="text",
+        lint_key="lint_report",
+        template=template,
+    )
+    processor = CodeProcessor(
+        model_name=model_name,
+        tensor_parallel_size=tensor_parallel_size,
+        max_model_len=model_max_length,
+        use_async=True,
     )
 
     # Extract file number from input_path (e.g., train_0004.jsonl -> 0004)
@@ -382,68 +410,23 @@ def llm_auto_fix(
 
         print(f"Filtered data: {len(filtered_data)} items to process, {skipped_count} items skipped due to length")
 
-        # Process in batches
+        # Process using async CodeProcessor
         fixed_data = []
         if filtered_data:
             print("Starting error fixing process...")
 
-            for i in range(0, len(filtered_data), batch_size):
-                batch = filtered_data[i : i + batch_size]
-                print(f"Processing batch {i // batch_size + 1}/{(len(filtered_data) + batch_size - 1) // batch_size}")
+            async def _consume() -> None:
+                async for ev in processor.process_code(iter(filtered_data), processor=fix_proc, max_in_flight=1024):
+                    if "error" in ev:
+                        continue
+                    item = ev["item"]
+                    fixed = ev["result"]
+                    extracted = extract_code_from_markdown(fixed, lang)
+                    item["auto_fix_output"] = extracted
+                    item["text"] = extracted
+                    fixed_data.append(item)
 
-                # Prepare codes and lint_reports for fix_errors
-                codes = []
-                lint_reports = []
-
-                for item in batch:
-                    codes.append(item.get("text", ""))
-                    lint_report = item.get("lint_report", [])
-                    if isinstance(lint_report, list):
-                        lint_reports.append(json.dumps(lint_report))
-                    else:
-                        lint_reports.append(str(lint_report))
-
-                # Call pipeline.fix_errors
-                try:
-                    fixed_codes = pipeline.fix_errors(codes, lint_reports)
-
-                    # Extract code from markdown code blocks if present
-                    def extract_code_from_markdown(text: str, lang: str) -> str:
-                        code_block_marker = f"```{lang}"
-
-                        if code_block_marker in text:
-                            # Find the first ```{lang} block
-                            start_marker = code_block_marker
-                            end_marker = "```"
-
-                            start_idx = text.find(start_marker)
-                            if start_idx != -1:
-                                # Move past the start marker and any newline
-                                code_start = start_idx + len(start_marker)
-                                if code_start < len(text) and text[code_start] == "\n":
-                                    code_start += 1
-
-                                # Find the closing ```
-                                end_idx = text.find(end_marker, code_start)
-                                if end_idx != -1:
-                                    return text[code_start:end_idx].strip()
-
-                        # If no code block found, return original text
-                        return text
-
-                    # Update items with fixed codes
-                    for j, fixed_code in enumerate(fixed_codes):
-                        extracted_code = extract_code_from_markdown(fixed_code, lang)
-                        batch[j]["auto_fix_output"] = extracted_code  # Store extracted code
-                        batch[j]["text"] = extracted_code  # Store extracted code
-
-                    fixed_data.extend(batch)
-
-                except Exception as e:
-                    print(f"Error processing batch: {e}")
-                    # Keep original data if fixing fails
-                    fixed_data.extend(batch)
-
+            asyncio.run(_consume())
             print("[INFO]: Error fixing completed")
 
         # Re-run auto_format on fixed data
