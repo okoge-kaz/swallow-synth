@@ -7,12 +7,16 @@ from pathlib import Path
 from multiprocessing import Pool, cpu_count
 from typing import Callable, Any, Iterator
 import tempfile
+from functools import partial
+
 
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
     PythonRewritePipeline,
 )
 from src.languages.abc import RewritePipeline
+from src.prompts.python.stage4 import PYTHON_STAGE4_PROMPT
+from src.processor import CodeProcessor, score_processor_stage4
 
 
 def get_process_item_cpu(lang: str) -> Callable:
@@ -239,8 +243,7 @@ def llm_rewrite(
 
     print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
 
-    with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
-
+    with output_path.open("w", encoding="utf-8") as fout:
         async def _consume() -> None:
             # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
             async for ev in pipeline.rewrite_codes(stream_jsonl_(input_path), prompt_type=prompt_type):
@@ -534,8 +537,10 @@ def llm_scoring(
     model_max_length: int = 40960,
 ) -> None:
     """LLM-based code quality scoring using GPU processing"""
-    pipeline = get_rewrite_pipeline(
-        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+    processor = CodeProcessor(
+        model_name=model_name,
+        tensor_parallel_size=tensor_parallel_size,
+        max_model_len=model_max_length,
     )
 
     total_items = 0
@@ -551,30 +556,25 @@ def llm_scoring(
         score_key = "score"
         evaluation_key = f"{model_name}_evaluation"
 
-    with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
-        for batch in stream_jsonl(input_path, batch_size):
-            total_items += len(batch)
-            print(f"Processing batch of {len(batch)} items...")
+    score_proc = partial(score_processor_stage4, value_key="text_formatted", system_prompt=PYTHON_STAGE4_PROMPT)
 
-            # key in batch should be "text_formatted" for LLM scoring
-            if not all("text_formatted" in item for item in batch):
-                raise ValueError("All items in the batch must contain 'text_formatted' key for LLM scoring")
-            codes = [item.get("text_formatted", "") for item in batch]
-
-            # Call pipeline.score_codes
-            try:
-                evaluations = pipeline.get_scores(codes)
-                scores = extract_scores_from_multiple_texts(evaluations)
-
-                # Write results to output file
-                for index, item in enumerate(batch):
-                    score = scores[index] if index < len(scores) else 0  # Default to
+    with output_path.open("w", encoding="utf-8") as fout:
+        async def _consume() -> None:
+            # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
+            async for ev in processor.process_code(stream_jsonl_(input_path), processor=score_proc, max_in_flight=1024):
+                if "error" not in ev:
+                    item = ev["item"]
+                    evaluation = ev["result"]
+                    score = extract_scores_from_multiple_texts([evaluation])[0]
                     item[score_key] = score
-                    item[evaluation_key] = evaluations[index] if index < len(evaluations) else ""
+                    item[evaluation_key] = evaluation
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+                    fout.flush()  # ensure truly streaming writes
 
-            except Exception as e:
-                print(f"Error during scoring: {e}")
+                nonlocal total_items
+                total_items += 1
+
+        asyncio.run(_consume())
 
     actual_time = time.time() - start_time
     print(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
