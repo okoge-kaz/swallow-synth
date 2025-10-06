@@ -15,8 +15,8 @@ from src.languages.python import (
     PythonRewritePipeline,
 )
 from src.languages.abc import RewritePipeline
-from src.prompts.python.stage4 import PYTHON_STAGE4_PROMPT
-from src.processor import CodeProcessor, score_processor_stage4
+from src.prompts import get_prompt
+from src.processor import CodeProcessor, score_processor_stage4, llm_rewrite_processor
 
 
 def get_process_item_cpu(lang: str) -> Callable:
@@ -230,12 +230,10 @@ def llm_rewrite(
     prompt_type: str = "stage5",
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
-    pipeline = get_rewrite_pipeline(
-        lang=lang,
+    processor = CodeProcessor(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
-        model_max_length=model_max_length,
-        use_async=True,
+        max_model_len=model_max_length,
     )
 
     total_items = 0
@@ -243,10 +241,15 @@ def llm_rewrite(
 
     print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
 
+    system_prompt = get_prompt(prompt_type, lang)
+
+    rewrite_proc = partial(llm_rewrite_processor, value_key="text_formatted", system_prompt=system_prompt)
+
     with output_path.open("w", encoding="utf-8") as fout:
+
         async def _consume() -> None:
             # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
-            async for ev in pipeline.rewrite_codes(stream_jsonl_(input_path), prompt_type=prompt_type):
+            async for ev in processor.process_code(stream_jsonl_(input_path), processor=rewrite_proc, max_in_flight=1024):
                 if "error" not in ev:
                     item = ev["item"]
                     improved_text = ev["result"]
@@ -556,11 +559,13 @@ def llm_scoring(
         score_key = "score"
         evaluation_key = f"{model_name}_evaluation"
 
-    score_proc = partial(score_processor_stage4, value_key="text_formatted", system_prompt=PYTHON_STAGE4_PROMPT)
+    system_prompt = get_prompt("stage4", lang)
+
+    score_proc = partial(score_processor_stage4, value_key="text_formatted", system_prompt=system_prompt)
 
     with output_path.open("w", encoding="utf-8") as fout:
+
         async def _consume() -> None:
-            # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
             async for ev in processor.process_code(stream_jsonl_(input_path), processor=score_proc, max_in_flight=1024):
                 if "error" not in ev:
                     item = ev["item"]
@@ -569,7 +574,7 @@ def llm_scoring(
                     item[score_key] = score
                     item[evaluation_key] = evaluation
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
-                    fout.flush()  # ensure truly streaming writes
+                    fout.flush()
 
                 nonlocal total_items
                 total_items += 1

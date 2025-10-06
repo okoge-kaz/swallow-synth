@@ -104,6 +104,45 @@ class AsyncLLMClient:
             return text, in_toks, out_toks
 
 
+def llm_rewrite_processor(
+    item: Dict[str, Any],
+    *,
+    tokenizer,
+    max_model_len: int,
+    value_key: str = "text_formatted",  # adjust with partial
+    system_prompt: str = "",  # adjust with partial
+    temperature: float = 0.0,  # adjust with partial
+) -> Tuple[str, SamplingParams]:
+    if value_key not in item:
+        raise KeyError(f"Item missing required key '{value_key}'.")
+
+    if system_prompt == "":
+        raise ValueError("system_prompt is empty, use functools.partial to set a system prompt")
+
+    code = item.get(value_key, "")
+
+    prompt = (
+        "<|im_start|>system\n"
+        + system_prompt
+        + "<|im_end|>\n"
+        + "<|im_start|>user\n"
+        + f"{code}\n"
+        + "<|im_end|>\n"
+        + "<|im_start|>assistant\n"
+    )
+
+    used = len(tokenizer.encode(prompt))
+    if used >= max_model_len:
+        raise ValueError(
+            f"Prompt length exceeds model limit: {used} >= {max_model_len}. "
+            "Consider truncating input or increasing context."
+        )
+    max_tokens = max(1, max_model_len - used)
+
+    sp = SamplingParams(temperature=temperature, max_tokens=max_tokens)
+    return prompt, sp
+
+
 def score_processor_stage4(
     item: Dict[str, Any],
     *,
@@ -120,8 +159,6 @@ def score_processor_stage4(
         raise ValueError("system_prompt is empty, use functools.partial to set a system prompt")
 
     text = item[value_key]
-    if not isinstance(text, str):
-        raise TypeError(f"Item['{value_key}'] must be str, got {type(text).__name__}.")
 
     prompt = (
         "<|im_start|>system\n"
