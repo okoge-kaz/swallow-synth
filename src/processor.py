@@ -104,6 +104,45 @@ class AsyncLLMClient:
             return text, in_toks, out_toks
 
 
+def fix_errors_processor_stage2(
+    item: Dict[str, Any],
+    *,
+    tokenizer,
+    max_model_len: int,
+    template: str = "",
+    code_key: str = "code",
+    lint_key: str = "lint_report",
+    temperature: float = 0.0,
+) -> Tuple[str, SamplingParams]:
+    if code_key not in item:
+        raise KeyError(f"Item missing '{code_key}'.")
+    if lint_key not in item:
+        raise KeyError(f"Item missing '{lint_key}'.")
+
+    code = item[code_key]
+    lint_report = item[lint_key]
+
+    if isinstance(lint_report, list):
+        import json
+
+        lint_report_str = json.dumps(lint_report, ensure_ascii=False)
+    else:
+        lint_report_str = str(lint_report)
+
+    prompt = template.format(lint_report=lint_report_str, code=code)
+
+    used = len(tokenizer.encode(prompt))
+    if used >= max_model_len:
+        raise ValueError(
+            f"Prompt length exceeds model limit: {used} >= {max_model_len}. "
+            "Consider truncating the input or increasing context."
+        )
+    max_tokens = max(1, max_model_len - used)
+
+    sp = SamplingParams(temperature=temperature, max_tokens=max_tokens)
+    return prompt, sp
+
+
 def llm_rewrite_processor(
     item: Dict[str, Any],
     *,
