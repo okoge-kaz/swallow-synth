@@ -9,9 +9,8 @@ from typing import Dict, Any, List, Tuple, Optional, Iterator, AsyncIterator
 
 from transformers import AutoTokenizer
 from src.prompts.python.stage2 import PYTHON_STAGE2_PROMPT
-from src.prompts.python.stage4 import PYTHON_STAGE4_PROMPT
-from src.prompts.python.stage5 import PYTHON_STAGE5_REWRITE_PROMPT
-from src.prompts.python.stage8 import PYTHON_STAGE8_REWRITE_PROMPT
+from src.prompts.python.stage5 import PYTHON_STAGE5_PROMPT
+from src.prompts.python.stage8 import PYTHON_STAGE8_PROMPT
 from src.languages.abc import RewritePipeline
 
 try:
@@ -260,9 +259,9 @@ class PythonRewritePipeline(RewritePipeline):
 
             # Select prompt based on prompt_type
             if prompt_type == "stage5":
-                PROMPT = PYTHON_STAGE5_REWRITE_PROMPT
+                PROMPT = PYTHON_STAGE5_PROMPT
             elif prompt_type == "stage8":
-                PROMPT = PYTHON_STAGE8_REWRITE_PROMPT
+                PROMPT = PYTHON_STAGE8_PROMPT
             else:
                 raise ValueError(f"Unsupported prompt_type: {prompt_type}. Supported types: 'stage5', 'stage8'")
 
