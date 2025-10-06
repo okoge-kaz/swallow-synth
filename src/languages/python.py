@@ -124,69 +124,37 @@ class PythonRewritePipeline(RewritePipeline):
         self.tensor_parallel_size = tensor_parallel_size
         self.max_model_len = max_model_len
 
-        if use_async:
-            if backend != "vllm":
-                raise RuntimeError("async execution requires vllm backend")
-
-            engine_args = AsyncEngineArgs(
+        # sync and tensorrt-llm backend
+        if backend == "vllm":
+            self.llm = LLM(
                 model=model_name,
-                max_num_seqs=512,  # H200 141GB SXM5 HBM3e x 8
-                task="generate",
-                enable_prefix_caching=True,
-                enforce_eager=True,
-                async_scheduling=True,
-                enable_chunked_prefill=True,
                 tensor_parallel_size=tensor_parallel_size,
+                max_num_seqs=512,
                 gpu_memory_utilization=0.95,
                 max_model_len=max_model_len,
             )
-            self.engine = AsyncLLM.from_engine_args(engine_args)
         else:
-            # sync and tensorrt-llm backend
-            if backend == "vllm":
-                self.llm = LLM(
-                    model=model_name,
-                    tensor_parallel_size=tensor_parallel_size,
-                    max_num_seqs=512,
-                    gpu_memory_utilization=0.95,
-                    max_model_len=max_model_len,
-                )
-            else:
-                self.llm = LLM(
-                    model=model_name,
-                    tensor_parallel_size=tensor_parallel_size,
-                    pipeline_parallel_size=1,
-                    max_seq_len=max_model_len,
-                    cuda_graph_config=CudaGraphConfig(
-                        batch_sizes=make_list(512),
-                        # batch_sizes=[1, 2, 4, 8, 16, 32, 48, 64, 128],
-                        enable_padding=True,
-                    ),
-                    max_num_tokens=max_model_len * 8,  # TODO reduce when OOM
-                    max_batch_size=512,
-                    kv_cache_config=KvCacheConfig(
-                        free_gpu_memory_fraction=0.9,
-                        enable_block_reuse=True,
-                    ),
-                    enable_chunked_prefill=True,
-                )
+            self.llm = LLM(
+                model=model_name,
+                tensor_parallel_size=tensor_parallel_size,
+                pipeline_parallel_size=1,
+                max_seq_len=max_model_len,
+                cuda_graph_config=CudaGraphConfig(
+                    batch_sizes=make_list(512),
+                    # batch_sizes=[1, 2, 4, 8, 16, 32, 48, 64, 128],
+                    enable_padding=True,
+                ),
+                max_num_tokens=max_model_len * 8,  # TODO reduce when OOM
+                max_batch_size=512,
+                kv_cache_config=KvCacheConfig(
+                    free_gpu_memory_fraction=0.9,
+                    enable_block_reuse=True,
+                ),
+                enable_chunked_prefill=True,
+            )
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    async def run_request(self, engine, item, prompt, sampling_params, request_id):
-        async for output in engine.generate(request_id=request_id, prompt=prompt, sampling_params=sampling_params):
-            if output.finished:
-                # input tokens
-                in_toks = len(output.prompt_token_ids or [])
-                # output tokens
-                out_toks = sum(len(stp.token_ids) for stp in output.outputs)
-                return request_id, item, output.outputs[0].text, in_toks, out_toks
-
-    def generate(self, prompts: list[str]) -> list[str]:
-        # Greedy / deterministic inference
-        params = SamplingParams(temperature=0)
-        outputs = self.llm.generate(prompts, params)
-        return [output.text for output in outputs]  # type: ignore
 
     def fix_errors(self, codes: list[str], lint_reports: list[str]) -> list[str]:
         # Construct chat templates for batch processing
