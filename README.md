@@ -106,6 +106,7 @@ uv pip install mpi4py openmpi
 ```
 
 ### Dependencies
+
 - `datasets>=3.6.0` - Dataset processing
 - `pyarrow>=20.0.0` - Efficient data I/O
 - `ruff>=0.11.10` - Python formatting and linting
@@ -117,24 +118,28 @@ uv pip install mpi4py openmpi
 ### Running the Complete Pipeline
 
 1. **Stage 1 - Format**:
+
 ```bash
 # Submit formatting job
 qsub scripts/abci/pipeline/python/stage1_format.sh
 ```
 
 2. **Stage 2 - Auto-fix**:
+
 ```bash
 # Submit error fixing job
 qsub scripts/abci/pipeline/python/stage2_auto_fix.sh
 ```
 
 3. **Stage 3 - Context Sampling**:
+
 ```bash
 # Submit length filtering job
 qsub scripts/abci/pipeline/python/stage3.sh
 ```
 
 4. **Stage 4 - Quality Scoring**:
+
 ```bash
 # Submit quality evaluation job
 qsub scripts/abci/pipeline/python/stage4_score.sh
@@ -143,6 +148,7 @@ qsub scripts/abci/pipeline/python/stage4_score.sh
 ### Configuration
 
 Edit the shell scripts to customize:
+
 - Input/output paths
 - Batch sizes
 - Model configurations
@@ -151,6 +157,7 @@ Edit the shell scripts to customize:
 ### Monitoring Progress
 
 Check job outputs in the `outputs/` directory:
+
 ```bash
 # View processing logs
 tail -f outputs/pipeline/stage1_python/*.OU
@@ -192,11 +199,13 @@ Final scores range from 1-10, with detailed reasoning provided for each evaluati
 ## Performance
 
 ### Throughput
+
 - **Stage 1**: ~xx files/day (CPU-based formatting)
 - **Stage 2**: ~xx files/day (LLM-based fixing)
 - **Stage 4**: ~xx files/day (Quality scoring)
 
 ### Quality Improvements
+
 - **Error Reduction**: xx of syntax errors automatically fixed
 - **Documentation**: xx% increase in code comments and docstrings
 - **Consistency**: xx% adherence to language formatting standards
