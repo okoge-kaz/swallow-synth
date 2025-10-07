@@ -49,4 +49,6 @@ mpirun --oversubscribe -np 1 python src/pipeline.py llm_auto_fix \
   --model-max-length 32768 \
   --lang python \
   --batch-size 1024 \
-  --tensor-parallel-size 1
+  --tensor-parallel-size 1 \
+  --code_key text \
+  --lint_key lint_report

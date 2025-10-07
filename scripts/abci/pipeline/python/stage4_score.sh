@@ -35,7 +35,7 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-source ./.trt/bin/activate
+source .venv/bin/activate
 
 INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage3/python/train_${INDEX}.jsonl"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python"
@@ -45,7 +45,7 @@ MODEL_NAME=Qwen3-14B
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export TOKENIZERS_PARALLELISM="false"
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
 mpirun --oversubscribe -np 1 python src/pipeline.py llm_scoring \
   --input-jsonl $INPUT_FILE_PATH \
@@ -54,4 +54,5 @@ mpirun --oversubscribe -np 1 python src/pipeline.py llm_scoring \
   --model-max-length 32768 \
   --lang python \
   --batch-size 2048 \
-  --tensor-parallel-size 8
+  --tensor-parallel-size 8 \
+  --code_key text_formatted

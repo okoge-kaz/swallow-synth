@@ -54,7 +54,7 @@ mkdir -p $OUTPUT_DIR
 
 
 export TOKENIZERS_PARALLELISM="false"
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
 # --- shard A: INDEX (GPU 0-3) ---
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
@@ -64,7 +64,8 @@ python src/pipeline.py rewrite \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
   --batch-size 4096 \
-  --tensor-parallel-size 4 &
+  --tensor-parallel-size 4 \
+  --code_key text_formatted &
 
 PID_A=$!
 
@@ -76,7 +77,8 @@ python src/pipeline.py rewrite \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
   --batch-size 4096 \
-  --tensor-parallel-size 4 &
+  --tensor-parallel-size 4 \
+  --code_key text_formatted &
 
 PID_B=$!
 

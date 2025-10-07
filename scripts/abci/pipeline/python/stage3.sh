@@ -26,7 +26,7 @@ OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage3/python
 mkdir -p $OUTPUT_DIR
 
 export TOKENIZERS_PARALLELISM="false"
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
 # 処理範囲の設定
 MIN_INDEX=1

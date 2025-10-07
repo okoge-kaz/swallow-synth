@@ -24,7 +24,7 @@ INPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/python/
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage7/python/medium_quality/Qwen3-235B-A22B-Instruct-2507"
 mkdir -p $OUTPUT_DIR
 
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 uv run python src/pipeline.py filter_rewritten_code \
   --input-dir $INPUT_DIR \
   --output-dir $OUTPUT_DIR

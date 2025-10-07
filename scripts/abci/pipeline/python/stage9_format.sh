@@ -35,7 +35,7 @@ OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage9/py
 OUTPUT_FILE=${OUTPUT_FILE_DIR}/train_${INDEX}_Qwen3-235B-A22B-Instruct-2507.jsonl
 mkdir -p $OUTPUT_FILE_DIR
 
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 uv run python src/pipeline.py format_check \
   --input-jsonl $INPUT_FILE \
   --output-jsonl $OUTPUT_FILE \
