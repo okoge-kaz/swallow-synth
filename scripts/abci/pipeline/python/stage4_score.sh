@@ -53,6 +53,5 @@ mpirun --oversubscribe -np 1 python src/pipeline.py llm_scoring \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --model-max-length 32768 \
   --lang python \
-  --batch-size 2048 \
   --tensor-parallel-size 8 \
   --code_key text_formatted

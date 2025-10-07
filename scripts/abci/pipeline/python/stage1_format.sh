@@ -50,8 +50,8 @@ for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
   echo "Input: $FILE"
   echo "Output: $OUTPUT_FILE (INDEX=$INDEX, FILE_NUMBER=$FILE_NUMBER, FILE_INDEX=$FILE_INDEX)"
 
-  export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-  uv run python src/pipeline.py auto_format \
+  export PYTHONPATH="$PWD:$PYTHONPATH"
+  mpirun --oversubscribe -np 1 python src/pipeline.py auto_format \
     --input-jsonl $FILE \
     --output-jsonl $OUTPUT_FILE \
     --workers 16 \

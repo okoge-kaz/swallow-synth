@@ -36,7 +36,7 @@ OUTPUT_FILE=${OUTPUT_FILE_DIR}/train_${INDEX}.jsonl
 mkdir -p $OUTPUT_FILE_DIR
 
 export PYTHONPATH="$PWD:$PYTHONPATH"
-uv run python src/pipeline.py format_check \
+mpirun --oversubscribe -np 1 python src/pipeline.py format_check \
   --input-jsonl $INPUT_FILE \
   --output-jsonl $OUTPUT_FILE \
   --workers 32 \

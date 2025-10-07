@@ -45,12 +45,11 @@ MODEL_NAME=Qwen3-235B-A22B-Instruct-2507
 
 export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 export TOKENIZERS_PARALLELISM="false"
-export groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-uv run python src/pipeline.py second_rewrite \
+export PYTHONPATH="$PWD:$PYTHONPATH"
+mpirun --oversubscribe -np 1 python src/pipeline.py second_rewrite \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_DIR/train_${INDEX}_${MODEL_NAME}.jsonl \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
-  --batch-size 4096 \
   --tensor-parallel-size 8 \
   --code_key text_formatted

@@ -25,6 +25,6 @@ OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage7/python
 mkdir -p $OUTPUT_DIR
 
 export PYTHONPATH="$PWD:$PYTHONPATH"
-uv run python src/pipeline.py filter_rewritten_code \
+mpirun --oversubscribe -np 1 python src/pipeline.py filter_rewritten_code \
   --input-dir $INPUT_DIR \
   --output-dir $OUTPUT_DIR

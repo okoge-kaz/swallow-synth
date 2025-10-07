@@ -89,7 +89,7 @@ for ((i=MIN_INDEX; i<=MAX_INDEX; i++)); do
   echo "Starting processing at: $(date)"
 
   # 処理実行
-  if uv run python src/pipeline.py long_context_sample \
+  if mpirun --oversubscribe -np 1 python src/pipeline.py long_context_sample \
     --input-jsonl "$INPUT_FILE_PATH" \
     --output-path "$OUTPUT_FILE_PATH" \
     --tokenizer "/groups/gag51395/hf_checkpoints/Qwen3-235B-A22B" \
