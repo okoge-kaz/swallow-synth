@@ -51,4 +51,4 @@ mpirun --oversubscribe -np 1 python src/pipeline.py llm_auto_fix \
   --batch-size 1024 \
   --tensor-parallel-size 1 \
   --code-key text \
-  --lint_key lint_report
+  --lint-key lint_report
