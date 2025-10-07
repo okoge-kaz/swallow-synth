@@ -224,7 +224,6 @@ def llm_rewrite(
     output_path: Path,
     lang: str,
     model_name: str = "qwen-3",
-    batch_size: int = 32,
     tensor_parallel_size: int = 1,
     model_max_length: int = 40960,
     prompt_type: str = "stage5",
@@ -346,7 +345,7 @@ def llm_auto_fix(
     fix_proc = partial(
         fix_errors_processor_stage2,
         code_key=code_key,
-        lint_key="lint_report",
+        lint_key=lint_key,
         template=template,
     )
     processor = CodeProcessor(
@@ -522,7 +521,6 @@ def llm_scoring(
     output_path: Path,
     lang: str,
     model_name: str = "qwen-3",
-    batch_size: int = 1024,
     tensor_parallel_size: int = 1,
     compare_model: bool = False,
     model_max_length: int = 40960,
@@ -748,7 +746,6 @@ if __name__ == "__main__":
     p4.add_argument("--output-jsonl", type=Path, required=True)
     p4.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
     p4.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
-    p4.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p4.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p4.add_argument("--compare-model", action="store_true", help="Compare with another model")
     p4.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for scoring")
@@ -765,7 +762,6 @@ if __name__ == "__main__":
     p5.add_argument("--output-jsonl", type=Path, required=True)
     p5.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p5.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
-    p5.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p5.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p5.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
     p5.add_argument(
@@ -807,7 +803,6 @@ if __name__ == "__main__":
     p9.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file for second rewrite")
     p9.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p9.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
-    p9.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p9.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p9.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
     p9.add_argument(
@@ -818,13 +813,6 @@ if __name__ == "__main__":
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
     )
     p9.add_argument(
-        "--code_key",
-        "--code-key",
-        type=str,
-        default="text_formatted",
-        help="JSON key containing the code to rewrite (default: text_formatted)",
-    )
-    p5.add_argument(
         "--code_key",
         type=str,
         default="text_formatted",
@@ -867,7 +855,6 @@ if __name__ == "__main__":
             output_path=args.output_jsonl,
             model_name=args.model,
             lang=args.lang,
-            batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             compare_model=args.compare_model,
             model_max_length=args.model_max_length,
@@ -879,7 +866,6 @@ if __name__ == "__main__":
             output_path=args.output_jsonl,
             lang=args.lang,
             model_name=args.model,
-            batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
             prompt_type=args.prompt_type,
@@ -916,7 +902,6 @@ if __name__ == "__main__":
             output_path=args.output_jsonl,
             lang=args.lang,
             model_name=args.model,
-            batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
             prompt_type=args.prompt_type,
