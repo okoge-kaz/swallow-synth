@@ -23,7 +23,7 @@ if [ -z "$INDEX" ]; then
   exit 1
 fi
 
-module load cuda/12.6/12.6.1
+module load cuda/12.8/12.8.1
 
 # Format INDEX to 4 digits with leading zeros
 INDEX=$(printf "%04d" $INDEX)

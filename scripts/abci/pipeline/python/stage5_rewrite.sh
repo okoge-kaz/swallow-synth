@@ -30,7 +30,7 @@ if [ "$INDEX_INT" -lt 0 ] || [ "$INDEX_INT" -gt 162 ]; then
 fi
 OTHER_INT=$((INDEX_INT + 1))
 
-module load cuda/12.6/12.6.1
+module load cuda/12.8/12.8.1
 
 # Format INDEX to 4 digits with leading zeros
 INDEX_PAD=$(printf "%04d" "$INDEX_INT")

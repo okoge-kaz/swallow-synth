@@ -35,7 +35,7 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-source .venv/bin/activate
+source .trt/bin/activate
 
 INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage3/python/train_${INDEX}.jsonl"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage4/python"
