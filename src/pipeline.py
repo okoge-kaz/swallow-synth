@@ -228,6 +228,7 @@ def llm_rewrite(
     tensor_parallel_size: int = 1,
     model_max_length: int = 40960,
     prompt_type: str = "stage5",
+    code_key: str = "text_formatted",
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     processor = CodeProcessor(
@@ -243,7 +244,7 @@ def llm_rewrite(
 
     system_prompt = get_prompt(prompt_type, lang)
 
-    rewrite_proc = partial(llm_rewrite_processor, value_key="text_formatted", system_prompt=system_prompt)
+    rewrite_proc = partial(llm_rewrite_processor, value_key=code_key, system_prompt=system_prompt)
 
     with output_path.open("w", encoding="utf-8") as fout:
 
@@ -336,13 +337,15 @@ def llm_auto_fix(
     batch_size: int = 32,
     tensor_parallel_size: int = 1,
     model_max_length: int = 40960,
+    code_key: str = "text",
+    lint_key: str = "lint_report",
 ) -> None:
     import re
 
     template = get_prompt("stage2", lang)
     fix_proc = partial(
         fix_errors_processor_stage2,
-        code_key="text",
+        code_key=code_key,
         lint_key="lint_report",
         template=template,
     )
@@ -372,7 +375,9 @@ def llm_auto_fix(
     with input_path.open("r", encoding="utf-8") as fin:
         for line in fin:
             item = json.loads(line)
-            if have_linter_errors(item):
+            # Determine errors based on the provided lint_key
+            has_errors = len(item.get(lint_key, [])) > 0 if lint_key in item else False
+            if has_errors:
                 with_errors_data.append(item)
             else:
                 without_errors_data.append(item)
@@ -521,6 +526,7 @@ def llm_scoring(
     tensor_parallel_size: int = 1,
     compare_model: bool = False,
     model_max_length: int = 40960,
+    code_key: str = "text_formatted",
 ) -> None:
     """LLM-based code quality scoring using GPU processing"""
     processor = CodeProcessor(
@@ -544,7 +550,7 @@ def llm_scoring(
 
     system_prompt = get_prompt("stage4", lang)
 
-    score_proc = partial(score_processor_stage4, value_key="text_formatted", system_prompt=system_prompt)
+    score_proc = partial(score_processor_stage4, value_key=code_key, system_prompt=system_prompt)
 
     with output_path.open("w", encoding="utf-8") as fout:
 
@@ -716,6 +722,18 @@ if __name__ == "__main__":
     p2.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p2.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p2.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length")
+    p2.add_argument(
+        "--code-key",
+        type=str,
+        default="text",
+        help="JSON key containing the code to fix (default: text)",
+    )
+    p2.add_argument(
+        "--lint-key",
+        type=str,
+        default="lint_report",
+        help="JSON key containing the lint report (default: lint_report)",
+    )
 
     # separate long context data
     p3 = sub.add_parser("long_context_sample", help="Separate code samples with and without linter errors")
@@ -734,6 +752,12 @@ if __name__ == "__main__":
     p4.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p4.add_argument("--compare-model", action="store_true", help="Compare with another model")
     p4.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for scoring")
+    p4.add_argument(
+        "--code_key",
+        type=str,
+        default="text_formatted",
+        help="JSON key containing the code to score (default: text_formatted)",
+    )
 
     # LLM rewrite subcommand
     p5 = sub.add_parser("rewrite", help="LLM-based code rewriting")
@@ -750,6 +774,12 @@ if __name__ == "__main__":
         default="stage5",
         choices=["stage5", "stage8"],
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
+    )
+    p5.add_argument(
+        "--code_key",
+        type=str,
+        default="text_formatted",
+        help="JSON key containing the code to rewrite (default: text_formatted)",
     )
 
     # format check
@@ -787,6 +817,19 @@ if __name__ == "__main__":
         choices=["stage5", "stage8"],
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
     )
+    p9.add_argument(
+        "--code_key",
+        "--code-key",
+        type=str,
+        default="text_formatted",
+        help="JSON key containing the code to rewrite (default: text_formatted)",
+    )
+    p5.add_argument(
+        "--code_key",
+        type=str,
+        default="text_formatted",
+        help="JSON key containing the code to rewrite (default: text_formatted)",
+    )
 
     args = parser.parse_args()
 
@@ -808,6 +851,8 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
+            code_key=args.code_key,
+            lint_key=args.lint_key,
         )
     elif args.cmd == "long_context_sample":  # stage 3
         separate_code_samples(
@@ -826,6 +871,7 @@ if __name__ == "__main__":
             tensor_parallel_size=args.tensor_parallel_size,
             compare_model=args.compare_model,
             model_max_length=args.model_max_length,
+            code_key=args.code_key,
         )
     elif args.cmd == "rewrite":  # stage 5
         llm_rewrite(
@@ -837,6 +883,7 @@ if __name__ == "__main__":
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
             prompt_type=args.prompt_type,
+            code_key=args.code_key,
         )
     elif args.cmd == "competitive_programming_write":
         competitive_programming_write(
@@ -873,6 +920,7 @@ if __name__ == "__main__":
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
             prompt_type=args.prompt_type,
+            code_key=args.code_key,
         )
     else:
         raise ValueError(f"Unknown command: {args.cmd}")
