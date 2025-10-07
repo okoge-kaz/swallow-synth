@@ -54,4 +54,4 @@ mpirun --oversubscribe -np 1 python src/pipeline.py llm_scoring \
   --model-max-length 32768 \
   --lang python \
   --tensor-parallel-size 8 \
-  --code_key text_formatted
+  --code-key text_formatted

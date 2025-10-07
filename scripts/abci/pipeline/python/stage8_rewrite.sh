@@ -52,4 +52,4 @@ mpirun --oversubscribe -np 1 python src/pipeline.py second_rewrite \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
   --tensor-parallel-size 8 \
-  --code_key text_formatted
+  --code-key text_formatted

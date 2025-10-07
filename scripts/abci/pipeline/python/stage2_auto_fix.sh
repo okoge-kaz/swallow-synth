@@ -32,7 +32,7 @@ export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-source ./.trt/bin/activate
+source .venv/bin/activate
 
 INPUT_FILE_PATH="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage1/python/train_${INDEX}.jsonl"
 OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage2/python"
@@ -40,7 +40,7 @@ mkdir -p $OUTPUT_DIR
 
 export CUDA_VISIBLE_DEVICES=0
 export TOKENIZERS_PARALLELISM="false"
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
 mpirun --oversubscribe -np 1 python src/pipeline.py llm_auto_fix \
   --input-jsonl $INPUT_FILE_PATH \
@@ -50,5 +50,5 @@ mpirun --oversubscribe -np 1 python src/pipeline.py llm_auto_fix \
   --lang python \
   --batch-size 1024 \
   --tensor-parallel-size 1 \
-  --code_key text \
+  --code-key text \
   --lint_key lint_report

@@ -64,7 +64,7 @@ mpirun --oversubscribe -np 1 python src/pipeline.py rewrite \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
   --tensor-parallel-size 4 \
-  --code_key text_formatted &
+  --code-key text_formatted &
 
 PID_A=$!
 
@@ -76,7 +76,7 @@ mpirun --oversubscribe -np 1 python src/pipeline.py rewrite \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
   --tensor-parallel-size 4 \
-  --code_key text_formatted &
+  --code-key text_formatted &
 
 PID_B=$!
 
