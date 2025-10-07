@@ -12,7 +12,6 @@ from functools import partial
 
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
-    PythonRewritePipeline,
 )
 from src.languages.abc import RewritePipeline
 from src.prompts import get_prompt
