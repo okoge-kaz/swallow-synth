@@ -749,7 +749,7 @@ if __name__ == "__main__":
     p4.add_argument("--compare-model", action="store_true", help="Compare with another model")
     p4.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for scoring")
     p4.add_argument(
-        "--code_key",
+        "--code-key",
         type=str,
         default="text_formatted",
         help="JSON key containing the code to score (default: text_formatted)",
@@ -771,7 +771,7 @@ if __name__ == "__main__":
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
     )
     p5.add_argument(
-        "--code_key",
+        "--code-key",
         type=str,
         default="text_formatted",
         help="JSON key containing the code to rewrite (default: text_formatted)",
@@ -812,7 +812,7 @@ if __name__ == "__main__":
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
     )
     p9.add_argument(
-        "--code_key",
+        "--code-key",
         type=str,
         default="text_formatted",
         help="JSON key containing the code to rewrite (default: text_formatted)",
