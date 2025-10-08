@@ -35,8 +35,8 @@ OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage6/py
 OUTPUT_FILE=${OUTPUT_FILE_DIR}/train_${INDEX}.jsonl
 mkdir -p $OUTPUT_FILE_DIR
 
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
-uv run python src/pipeline.py format_check \
+export PYTHONPATH="$PWD:$PYTHONPATH"
+mpirun --oversubscribe -np 1 python src/pipeline.py format_check \
   --input-jsonl $INPUT_FILE \
   --output-jsonl $OUTPUT_FILE \
   --workers 32 \

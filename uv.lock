@@ -1713,6 +1713,17 @@ wheels = [
 ]
 
 [[package]]
+name = "openmpi"
+version = "5.0.8"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/93/02bc550f07673c0c3558977f408f3c2b2e8c597d85d693305ebf458ab8f8/openmpi-5.0.8-py3-none-macosx_11_0_arm64.whl", hash = "sha256:78fc2e58a8aa2201870a4682d09ed5ccd5aa38f41861ede11e89a7c10b29ad77", size = 3102410, upload-time = "2025-06-25T07:30:26.399Z" },
+    { url = "https://files.pythonhosted.org/packages/56/02/0560fbbaf15895472e6b386c3b55ab4487d6699bb70f37b3006af38d89fe/openmpi-5.0.8-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:8d2dd5895ceaba5f0274cfb97720c2902068813c892c249ae7d84cbb69d11722", size = 3560759, upload-time = "2025-06-25T07:30:28.119Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/fa/66e4a0ea01a641451422645f51ca69d5b1c73f67974382fb97e5c50c438f/openmpi-5.0.8-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:8fa052474e8158fa8e3028369a62de6f0eeb0cd92540221ff47d25c3cdb4bd1b", size = 5915632, upload-time = "2025-06-25T07:30:29.832Z" },
+    { url = "https://files.pythonhosted.org/packages/52/36/55550dc19412a6929ddf1982cac6376bbfa9dd8b25a85be7b52917fe7421/openmpi-5.0.8-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:d8353fc70887f3373b3878826ce95771500202c1f7980e4d4755e0793b01acc8", size = 6345230, upload-time = "2025-06-25T07:30:31.917Z" },
+]
+
+[[package]]
 name = "outlines-core"
 version = "0.2.10"
 source = { registry = "https://pypi.org/simple" }
@@ -2854,6 +2865,7 @@ dependencies = [
     { name = "flashinfer-python" },
     { name = "llmcompressor" },
     { name = "matplotlib" },
+    { name = "openmpi" },
     { name = "pyarrow" },
     { name = "ruff" },
     { name = "seaborn" },
@@ -2867,6 +2879,7 @@ requires-dist = [
     { name = "flashinfer-python", specifier = ">=0.2.7.post1" },
     { name = "llmcompressor", specifier = ">=0.5.2" },
     { name = "matplotlib", specifier = ">=3.10.3" },
+    { name = "openmpi", specifier = ">=5.0.8" },
     { name = "pyarrow", specifier = ">=20.0.0" },
     { name = "ruff", specifier = ">=0.11.10" },
     { name = "seaborn", specifier = ">=0.13.2" },

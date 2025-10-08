@@ -26,7 +26,7 @@ OUTPUT_DIR="/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage3/python
 mkdir -p $OUTPUT_DIR
 
 export TOKENIZERS_PARALLELISM="false"
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
 # 処理範囲の設定
 MIN_INDEX=1
@@ -89,7 +89,7 @@ for ((i=MIN_INDEX; i<=MAX_INDEX; i++)); do
   echo "Starting processing at: $(date)"
 
   # 処理実行
-  if uv run python src/pipeline.py long_context_sample \
+  if mpirun --oversubscribe -np 1 python src/pipeline.py long_context_sample \
     --input-jsonl "$INPUT_FILE_PATH" \
     --output-path "$OUTPUT_FILE_PATH" \
     --tokenizer "/groups/gag51395/hf_checkpoints/Qwen3-235B-A22B" \

@@ -7,12 +7,15 @@ from pathlib import Path
 from multiprocessing import Pool, cpu_count
 from typing import Callable, Any, Iterator
 import tempfile
+from functools import partial
+
 
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
-    PythonRewritePipeline,
 )
 from src.languages.abc import RewritePipeline
+from src.prompts import get_prompt
+from src.processor import CodeProcessor, score_processor_stage4, llm_rewrite_processor, fix_errors_processor_stage2
 
 
 def get_process_item_cpu(lang: str) -> Callable:
@@ -22,17 +25,6 @@ def get_process_item_cpu(lang: str) -> Callable:
     if lang not in processors:
         raise ValueError(f"Unsupported language: {lang}")
     return processors[lang]
-
-
-def get_rewrite_pipeline(
-    lang: str, model_name: str, tensor_parallel_size: int = 1, model_max_length: int = 131072, use_async=False
-) -> RewritePipeline:
-    pipelines = {
-        "python": PythonRewritePipeline,
-    }
-    if lang not in pipelines:
-        raise ValueError(f"Unsupported language: {lang}")
-    return pipelines[lang](model_name, tensor_parallel_size, model_max_length, use_async)
 
 
 def process_chunk_to_file(args):
@@ -220,18 +212,16 @@ def llm_rewrite(
     output_path: Path,
     lang: str,
     model_name: str = "qwen-3",
-    batch_size: int = 32,
     tensor_parallel_size: int = 1,
     model_max_length: int = 40960,
     prompt_type: str = "stage5",
+    code_key: str = "text_formatted",
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
-    pipeline = get_rewrite_pipeline(
-        lang=lang,
+    processor = CodeProcessor(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
-        model_max_length=model_max_length,
-        use_async=True,
+        max_model_len=model_max_length,
     )
 
     total_items = 0
@@ -239,11 +229,17 @@ def llm_rewrite(
 
     print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
 
-    with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
+    system_prompt = get_prompt(prompt_type, lang)
+
+    rewrite_proc = partial(llm_rewrite_processor, value_key=code_key, system_prompt=system_prompt)
+
+    with output_path.open("w", encoding="utf-8") as fout:
 
         async def _consume() -> None:
             # pipeline.rewrite_codes must be an ASYNC GENERATOR that yields results per item.
-            async for ev in pipeline.rewrite_codes(stream_jsonl_(input_path), prompt_type=prompt_type):
+            async for ev in processor.process_code(
+                stream_jsonl_(input_path), processor=rewrite_proc, max_in_flight=1024
+            ):
                 if "error" not in ev:
                     item = ev["item"]
                     improved_text = ev["result"]
@@ -304,6 +300,22 @@ def separate_code_samples(
     print(f"Separated {len(longer_samples)} longer samples and {len(samples)} regular samples")
 
 
+def extract_code_from_markdown(text: str, lang: str) -> str:
+    code_block_marker = f"```{lang}"
+    if code_block_marker in text:
+        start_marker = code_block_marker
+        end_marker = "```"
+        start_idx = text.find(start_marker)
+        if start_idx != -1:
+            code_start = start_idx + len(start_marker)
+            if code_start < len(text) and text[code_start] == "\n":
+                code_start += 1
+            end_idx = text.find(end_marker, code_start)
+            if end_idx != -1:
+                return text[code_start:end_idx].strip()
+    return text
+
+
 def llm_auto_fix(
     input_path: Path,
     output_dir: Path,
@@ -312,11 +324,23 @@ def llm_auto_fix(
     batch_size: int = 32,
     tensor_parallel_size: int = 1,
     model_max_length: int = 40960,
+    code_key: str = "text",
+    lint_key: str = "lint_report",
 ) -> None:
     import re
 
-    pipeline = get_rewrite_pipeline(
-        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+    template = get_prompt("stage2", lang)
+    fix_proc = partial(
+        fix_errors_processor_stage2,
+        code_key=code_key,
+        lint_key=lint_key,
+        template=template,
+    )
+    processor = CodeProcessor(
+        model_name=model_name,
+        tensor_parallel_size=tensor_parallel_size,
+        max_model_len=model_max_length,
+        use_async=True,
     )
 
     # Extract file number from input_path (e.g., train_0004.jsonl -> 0004)
@@ -338,7 +362,9 @@ def llm_auto_fix(
     with input_path.open("r", encoding="utf-8") as fin:
         for line in fin:
             item = json.loads(line)
-            if have_linter_errors(item):
+            # Determine errors based on the provided lint_key
+            has_errors = len(item.get(lint_key, [])) > 0 if lint_key in item else False
+            if has_errors:
                 with_errors_data.append(item)
             else:
                 without_errors_data.append(item)
@@ -376,68 +402,23 @@ def llm_auto_fix(
 
         print(f"Filtered data: {len(filtered_data)} items to process, {skipped_count} items skipped due to length")
 
-        # Process in batches
+        # Process using async CodeProcessor
         fixed_data = []
         if filtered_data:
             print("Starting error fixing process...")
 
-            for i in range(0, len(filtered_data), batch_size):
-                batch = filtered_data[i : i + batch_size]
-                print(f"Processing batch {i // batch_size + 1}/{(len(filtered_data) + batch_size - 1) // batch_size}")
+            async def _consume() -> None:
+                async for ev in processor.process_code(iter(filtered_data), processor=fix_proc, max_in_flight=1024):
+                    if "error" in ev:
+                        continue
+                    item = ev["item"]
+                    fixed = ev["result"]
+                    extracted = extract_code_from_markdown(fixed, lang)
+                    item["auto_fix_output"] = extracted
+                    item["text"] = extracted
+                    fixed_data.append(item)
 
-                # Prepare codes and lint_reports for fix_errors
-                codes = []
-                lint_reports = []
-
-                for item in batch:
-                    codes.append(item.get("text", ""))
-                    lint_report = item.get("lint_report", [])
-                    if isinstance(lint_report, list):
-                        lint_reports.append(json.dumps(lint_report))
-                    else:
-                        lint_reports.append(str(lint_report))
-
-                # Call pipeline.fix_errors
-                try:
-                    fixed_codes = pipeline.fix_errors(codes, lint_reports)
-
-                    # Extract code from markdown code blocks if present
-                    def extract_code_from_markdown(text: str, lang: str) -> str:
-                        code_block_marker = f"```{lang}"
-
-                        if code_block_marker in text:
-                            # Find the first ```{lang} block
-                            start_marker = code_block_marker
-                            end_marker = "```"
-
-                            start_idx = text.find(start_marker)
-                            if start_idx != -1:
-                                # Move past the start marker and any newline
-                                code_start = start_idx + len(start_marker)
-                                if code_start < len(text) and text[code_start] == "\n":
-                                    code_start += 1
-
-                                # Find the closing ```
-                                end_idx = text.find(end_marker, code_start)
-                                if end_idx != -1:
-                                    return text[code_start:end_idx].strip()
-
-                        # If no code block found, return original text
-                        return text
-
-                    # Update items with fixed codes
-                    for j, fixed_code in enumerate(fixed_codes):
-                        extracted_code = extract_code_from_markdown(fixed_code, lang)
-                        batch[j]["auto_fix_output"] = extracted_code  # Store extracted code
-                        batch[j]["text"] = extracted_code  # Store extracted code
-
-                    fixed_data.extend(batch)
-
-                except Exception as e:
-                    print(f"Error processing batch: {e}")
-                    # Keep original data if fixing fails
-                    fixed_data.extend(batch)
-
+            asyncio.run(_consume())
             print("[INFO]: Error fixing completed")
 
         # Re-run auto_format on fixed data
@@ -528,14 +509,16 @@ def llm_scoring(
     output_path: Path,
     lang: str,
     model_name: str = "qwen-3",
-    batch_size: int = 1024,
     tensor_parallel_size: int = 1,
     compare_model: bool = False,
     model_max_length: int = 40960,
+    code_key: str = "text_formatted",
 ) -> None:
     """LLM-based code quality scoring using GPU processing"""
-    pipeline = get_rewrite_pipeline(
-        lang=lang, model_name=model_name, tensor_parallel_size=tensor_parallel_size, model_max_length=model_max_length
+    processor = CodeProcessor(
+        model_name=model_name,
+        tensor_parallel_size=tensor_parallel_size,
+        max_model_len=model_max_length,
     )
 
     total_items = 0
@@ -551,30 +534,27 @@ def llm_scoring(
         score_key = "score"
         evaluation_key = f"{model_name}_evaluation"
 
-    with input_path.open("r", encoding="utf-8") as fin, output_path.open("w", encoding="utf-8") as fout:
-        for batch in stream_jsonl(input_path, batch_size):
-            total_items += len(batch)
-            print(f"Processing batch of {len(batch)} items...")
+    system_prompt = get_prompt("stage4", lang)
 
-            # key in batch should be "text_formatted" for LLM scoring
-            if not all("text_formatted" in item for item in batch):
-                raise ValueError("All items in the batch must contain 'text_formatted' key for LLM scoring")
-            codes = [item.get("text_formatted", "") for item in batch]
+    score_proc = partial(score_processor_stage4, value_key=code_key, system_prompt=system_prompt)
 
-            # Call pipeline.score_codes
-            try:
-                evaluations = pipeline.get_scores(codes)
-                scores = extract_scores_from_multiple_texts(evaluations)
+    with output_path.open("w", encoding="utf-8") as fout:
 
-                # Write results to output file
-                for index, item in enumerate(batch):
-                    score = scores[index] if index < len(scores) else 0  # Default to
+        async def _consume() -> None:
+            async for ev in processor.process_code(stream_jsonl_(input_path), processor=score_proc, max_in_flight=1024):
+                if "error" not in ev:
+                    item = ev["item"]
+                    evaluation = ev["result"]
+                    score = extract_scores_from_multiple_texts([evaluation])[0]
                     item[score_key] = score
-                    item[evaluation_key] = evaluations[index] if index < len(evaluations) else ""
+                    item[evaluation_key] = evaluation
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+                    fout.flush()
 
-            except Exception as e:
-                print(f"Error during scoring: {e}")
+                nonlocal total_items
+                total_items += 1
+
+        asyncio.run(_consume())
 
     actual_time = time.time() - start_time
     print(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
@@ -728,6 +708,18 @@ if __name__ == "__main__":
     p2.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p2.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p2.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length")
+    p2.add_argument(
+        "--code-key",
+        type=str,
+        default="text",
+        help="JSON key containing the code to fix (default: text)",
+    )
+    p2.add_argument(
+        "--lint-key",
+        type=str,
+        default="lint_report",
+        help="JSON key containing the lint report (default: lint_report)",
+    )
 
     # separate long context data
     p3 = sub.add_parser("long_context_sample", help="Separate code samples with and without linter errors")
@@ -742,10 +734,15 @@ if __name__ == "__main__":
     p4.add_argument("--output-jsonl", type=Path, required=True)
     p4.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
     p4.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
-    p4.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p4.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p4.add_argument("--compare-model", action="store_true", help="Compare with another model")
     p4.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for scoring")
+    p4.add_argument(
+        "--code-key",
+        type=str,
+        default="text_formatted",
+        help="JSON key containing the code to score (default: text_formatted)",
+    )
 
     # LLM rewrite subcommand
     p5 = sub.add_parser("rewrite", help="LLM-based code rewriting")
@@ -753,7 +750,6 @@ if __name__ == "__main__":
     p5.add_argument("--output-jsonl", type=Path, required=True)
     p5.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p5.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
-    p5.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p5.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p5.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
     p5.add_argument(
@@ -762,6 +758,12 @@ if __name__ == "__main__":
         default="stage5",
         choices=["stage5", "stage8"],
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
+    )
+    p5.add_argument(
+        "--code-key",
+        type=str,
+        default="text_formatted",
+        help="JSON key containing the code to rewrite (default: text_formatted)",
     )
 
     # format check
@@ -789,7 +791,6 @@ if __name__ == "__main__":
     p9.add_argument("--output-jsonl", type=Path, required=True, help="Output JSONL file for second rewrite")
     p9.add_argument("--lang", type=str, required=True, help="Programming language (e.g., python, rust, java)")
     p9.add_argument("--model", type=str, default="qwen-3", help="Local Qwen model identifier for vLLM")
-    p9.add_argument("--batch-size", type=int, default=32, help="Batch size for processing")
     p9.add_argument("--tensor-parallel-size", type=int, default=1, help="Number of GPUs to use for tensor parallelism")
     p9.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length for rewriting")
     p9.add_argument(
@@ -798,6 +799,12 @@ if __name__ == "__main__":
         default="stage8",
         choices=["stage5", "stage8"],
         help="Prompt type for rewriting: stage5 (first rewrite) or stage8 (second rewrite)",
+    )
+    p9.add_argument(
+        "--code-key",
+        type=str,
+        default="text_formatted",
+        help="JSON key containing the code to rewrite (default: text_formatted)",
     )
 
     args = parser.parse_args()
@@ -820,6 +827,8 @@ if __name__ == "__main__":
             batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
+            code_key=args.code_key,
+            lint_key=args.lint_key,
         )
     elif args.cmd == "long_context_sample":  # stage 3
         separate_code_samples(
@@ -834,10 +843,10 @@ if __name__ == "__main__":
             output_path=args.output_jsonl,
             model_name=args.model,
             lang=args.lang,
-            batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             compare_model=args.compare_model,
             model_max_length=args.model_max_length,
+            code_key=args.code_key,
         )
     elif args.cmd == "rewrite":  # stage 5
         llm_rewrite(
@@ -845,10 +854,10 @@ if __name__ == "__main__":
             output_path=args.output_jsonl,
             lang=args.lang,
             model_name=args.model,
-            batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
             prompt_type=args.prompt_type,
+            code_key=args.code_key,
         )
     elif args.cmd == "competitive_programming_write":
         competitive_programming_write(
@@ -881,10 +890,10 @@ if __name__ == "__main__":
             output_path=args.output_jsonl,
             lang=args.lang,
             model_name=args.model,
-            batch_size=args.batch_size,
             tensor_parallel_size=args.tensor_parallel_size,
             model_max_length=args.model_max_length,
             prompt_type=args.prompt_type,
+            code_key=args.code_key,
         )
     else:
         raise ValueError(f"Unknown command: {args.cmd}")

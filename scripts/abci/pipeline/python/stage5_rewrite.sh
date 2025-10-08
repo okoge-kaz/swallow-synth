@@ -30,7 +30,7 @@ if [ "$INDEX_INT" -lt 0 ] || [ "$INDEX_INT" -gt 162 ]; then
 fi
 OTHER_INT=$((INDEX_INT + 1))
 
-module load cuda/12.6/12.6.1
+module load cuda/12.8/12.8.1
 
 # Format INDEX to 4 digits with leading zeros
 INDEX_PAD=$(printf "%04d" "$INDEX_INT")
@@ -54,29 +54,29 @@ mkdir -p $OUTPUT_DIR
 
 
 export TOKENIZERS_PARALLELISM="false"
-export PYTHONPATH="/groups/gag51395/fujii/src/swallow-code-v2:$PYTHONPATH"
+export PYTHONPATH="$PWD:$PYTHONPATH"
 
 # --- shard A: INDEX (GPU 0-3) ---
 export CUDA_VISIBLE_DEVICES="0,1,2,3"
-python src/pipeline.py rewrite \
+mpirun --oversubscribe -np 1 python src/pipeline.py rewrite \
   --input-jsonl $INPUT_A \
   --output-jsonl $OUTPUT_DIR/train_${INDEX_PAD}.jsonl \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
-  --batch-size 4096 \
-  --tensor-parallel-size 4 &
+  --tensor-parallel-size 4 \
+  --code-key text_formatted &
 
 PID_A=$!
 
 # --- shard B: OTHER (GPU 4-7) ---
 export CUDA_VISIBLE_DEVICES="4,5,6,7"
-python src/pipeline.py rewrite \
+mpirun --oversubscribe -np 1 python src/pipeline.py rewrite \
   --input-jsonl $INPUT_B \
   --output-jsonl $OUTPUT_DIR/train_${OTHER_PAD}.jsonl \
   --model "/groups/gag51395/hf_checkpoints/${MODEL_NAME}" \
   --lang python \
-  --batch-size 4096 \
-  --tensor-parallel-size 4 &
+  --tensor-parallel-size 4 \
+  --code-key text_formatted &
 
 PID_B=$!
 
