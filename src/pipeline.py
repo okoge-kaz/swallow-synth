@@ -37,11 +37,11 @@ def llm_rewrite(
     input_path: Path,
     output_path: Path,
     lang: str,
-    model_name: str = "qwen-3",
-    tensor_parallel_size: int = 1,
-    model_max_length: int = 40960,
-    prompt_type: str = "stage5",
-    code_key: str = "text_formatted",
+    model_name: str,
+    tensor_parallel_size: int,
+    model_max_length: int,
+    prompt_type: str,
+    code_key: str,
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     processor = CodeProcessor(
@@ -105,16 +105,7 @@ def llm_scoring(
     total_items = 0
     start_time = time.perf_counter()
     logger.info(f"Starting LLM scoring with {tensor_parallel_size} GPUs...")
-
-    model_name = os.path.basename(model_name)
-    if compare_model:
-        score_key = f"{model_name}_score"
-        evaluation_key = f"{model_name}_evaluation"
-    else:
-        score_key = "score"
-        evaluation_key = f"{model_name}_evaluation"
-
-    system_prompt = get_prompt("stage4", lang)
+    system_prompt = get_prompt("stage3", lang)
 
     score_proc = partial(score_processor_stage4, value_key=code_key, system_prompt=system_prompt)
 
