@@ -1,9 +1,11 @@
 import asyncio
 from itertools import count
 import time
-from typing import Any, AsyncIterator, Callable, Dict, Iterator, Tuple
+from typing import Any, AsyncIterator, Callable, Dict, Iterator, Tuple, cast
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizer
+
+from utils import apply_chat_template
 
 
 try:
@@ -27,6 +29,8 @@ if backend is None:
 else:
     print(f"Using backend: {backend}")
 
+from src.global_vars import get_logger
+
 
 def make_list(end: int):
     out = [x for x in (1, 2, 4, 8) if x <= end]
@@ -40,13 +44,17 @@ def make_list(end: int):
 class AsyncLLMClient:
     def __init__(
         self,
-        model_name: str = "qwen-3",
-        tensor_parallel_size: int = 1,
-        max_model_len: int = 40960,
+        model_name: str,
+        tensor_parallel_size: int,
+        max_model_len: int,
         *,
         max_num_seqs: int = 512,  # tune per hardware
         gpu_memory_utilization: float = 0.95,
     ) -> None:
+        self.logger = get_logger()
+        self.logger.info(f"Initializing AsyncLLMClient with backend: {backend}")
+        start_time = time.perf_counter()
+
         if backend == "vllm":
             engine_args = AsyncEngineArgs(
                 model=model_name,
@@ -80,6 +88,8 @@ class AsyncLLMClient:
                 ),
                 enable_chunked_prefill=True,
             )
+
+        self.logger.info(f"AsyncLLMClient initialized in {time.perf_counter() - start_time:.2f} seconds")
 
     async def generate(self, *, prompt: str, sampling_params: SamplingParams, request_id: str):
         """
@@ -147,27 +157,18 @@ def llm_rewrite_processor(
     *,
     tokenizer,
     max_model_len: int,
-    value_key: str = "text_formatted",  # adjust with partial
+    input_target_key: str, # adjust with partial
     system_prompt: str = "",  # adjust with partial
     temperature: float = 0.0,  # adjust with partial
 ) -> Tuple[str, SamplingParams]:
-    if value_key not in item:
-        raise KeyError(f"Item missing required key '{value_key}'.")
+    if input_target_key not in item:
+        raise KeyError(f"Item missing required key '{input_target_key}'.")
 
     if system_prompt == "":
         raise ValueError("system_prompt is empty, use functools.partial to set a system prompt")
 
-    code = item.get(value_key, "")
-
-    prompt = (
-        "<|im_start|>system\n"
-        + system_prompt
-        + "<|im_end|>\n"
-        + "<|im_start|>user\n"
-        + f"{code}\n"
-        + "<|im_end|>\n"
-        + "<|im_start|>assistant\n"
-    )
+    code: str = item.get(input_target_key, "")
+    prompt = apply_chat_template(tokenizer=tokenizer, system_prompt=system_prompt, user_input=code)
 
     used = len(tokenizer.encode(prompt))
     if used >= max_model_len:
@@ -181,33 +182,23 @@ def llm_rewrite_processor(
     return prompt, sp
 
 
-def score_processor_stage4(
+def score_processor(
     item: Dict[str, Any],
     *,
-    tokenizer,
+    tokenizer: PreTrainedTokenizer,
     max_model_len: int,
-    value_key: str = "text_formatted",  # adjust with partial
-    system_prompt: str = "",  # adjust with partial
+    input_target_key: str,  # adjust with partial
+    system_prompt: str,  # adjust with partial
     temperature: float = 0.0,  # adjust with partial
 ) -> Tuple[str, SamplingParams]:
-    if value_key not in item:
-        raise KeyError(f"Item missing required key '{value_key}'.")
+    if input_target_key not in item:
+        raise KeyError(f"Item missing required key '{input_target_key}'.")
 
     if system_prompt == "":
         raise ValueError("system_prompt is empty, use functools.partial to set a system prompt")
 
-    text = item[value_key]
-
-    prompt = (
-        "<|im_start|>system\n"
-        + system_prompt
-        + "<|im_end|>\n"
-        + "<|im_start|>user\n"
-        + f"{text}\n"
-        + "<|im_end|>\n"
-        + "<|im_start|>assistant\n"
-    )
-
+    text: str = item[input_target_key]
+    prompt = apply_chat_template(tokenizer=tokenizer, system_prompt=system_prompt, user_input=text)
     used = len(tokenizer.encode(prompt))
     if used >= max_model_len:
         raise ValueError(
@@ -222,13 +213,14 @@ def score_processor_stage4(
 class CodeProcessor:
     def __init__(
         self,
-        model_name: str = "qwen-3",
-        tensor_parallel_size: int = 1,
-        max_model_len: int = 40960,
+        model_name: str,
+        tensor_parallel_size: int,
+        max_model_len: int,
         use_async: bool = True,
     ) -> None:
         if not use_async:
             raise RuntimeError("This refactor is async-only. Provide a sync client if needed.")
+        self.logger = get_logger()
 
         self.llm = AsyncLLMClient(
             model_name=model_name,
@@ -239,6 +231,7 @@ class CodeProcessor:
         )
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = cast(PreTrainedTokenizer, self.tokenizer)
         self.max_model_len = max_model_len
 
     async def process_code(
@@ -281,12 +274,12 @@ class CodeProcessor:
                     totals["in"] += in_tokens
                     totals["out"] += out_tokens
                     elapsed = max(1e-6, time.perf_counter() - start)
-                    print(
+                    self.logger.info(
                         f"{rid}, tokens/sec: in={totals['in'] / elapsed:.2f}, out={totals['out'] / elapsed:.2f}, elapsed: {elapsed:.2f}"
                     )
                     yield {"item": item, "result": result}
                 except Exception as e:
-                    print(f"[task-error] {e!r}")
+                    self.logger.info(f"[task-error] {e!r}")
                     yield {"error": f"[swallow-code] [task-error] {e!r}"}
 
                 try:

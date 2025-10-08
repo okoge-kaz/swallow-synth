@@ -4,6 +4,8 @@ import re
 import time
 from typing import Any, Callable, Iterator, cast
 
+from transformers import PreTrainedTokenizer
+
 
 REWRITTEN_CODE_MARKER = "<|REWRITTEN_CODE|>:"
 
@@ -113,3 +115,19 @@ def extract_scores_from_multiple_texts(texts: list[str]) -> list[int]:
         score = extract_score(text)
         scores.append(score)
     return scores
+
+
+def apply_chat_template(
+    tokenizer: PreTrainedTokenizer,
+    system_prompt: str,
+    user_input: str,
+) -> str:
+    prompt = tokenizer.apply_chat_template(
+        conversation=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input},
+        ],
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+    return cast(str, prompt)
