@@ -28,8 +28,8 @@ jobs:
 
       - name: Check formatting (ruff format --check)
         run: |
-          ruff format --check .
+          ruff format --config pyproject.toml --check .
 
       - name: Lint (ruff check)
         run: |
-          ruff check --select E,F,I .
+          ruff check --config pyproject.toml --select E,F,I .
