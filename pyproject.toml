@@ -17,6 +17,10 @@ dependencies = [
     "vllm==0.10.0",
 ]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
 [tool.ruff]
 exclude = [
    ".bzr",
