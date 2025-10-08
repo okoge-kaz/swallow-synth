@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
-from typing import Any, Callable, Iterator, cast
 import re
 import time
+from typing import Any, Callable, Iterator, cast
 
 
 REWRITTEN_CODE_MARKER = "<|REWRITTEN_CODE|>:"

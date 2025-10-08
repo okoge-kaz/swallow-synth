@@ -1,5 +1,6 @@
 from importlib import import_module
 
+
 def get_prompt(stage: str, language: str = "python") -> str:
     """
     Dynamically load a prompt constant based on stage and language.

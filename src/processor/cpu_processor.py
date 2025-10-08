@@ -1,23 +1,21 @@
-from typing import Callable
+import json
+from multiprocessing import Pool, cpu_count
 import os
 from pathlib import Path
-import json
 import tempfile
+from typing import Callable
 
-from multiprocessing import Pool, cpu_count
-
-from src.utils import (
-    stream_jsonl,
-    split_into_chunks,
-    process_chunk_to_file,
-    merge_temp_files,
-    have_linter_errors,
-)
-
+from src.global_vars import get_logger
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
 )
-from src.global_vars import get_logger
+from src.utils import (
+    have_linter_errors,
+    merge_temp_files,
+    process_chunk_to_file,
+    split_into_chunks,
+    stream_jsonl,
+)
 
 
 def get_process_item_cpu(language: str) -> Callable:

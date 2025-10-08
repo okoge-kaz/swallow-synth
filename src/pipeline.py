@@ -1,23 +1,21 @@
 import argparse
 import asyncio
-import json
-import logging
-import os
-import time
-from pathlib import Path
-from multiprocessing import Pool, cpu_count
-from typing import Any, Iterator
 from functools import partial
+import json
+from multiprocessing import Pool, cpu_count
+import os
+from pathlib import Path
+import time
+from typing import Any, Iterator
 
-from processor.cpu_processor import auto_format, process_file_filter, filter_by_content_length
-from src.utils import (
-    extract_scores_from_multiple_texts,
-    extract_rewritten_code,
-)
+from processor.cpu_processor import auto_format, filter_by_content_length, process_file_filter
+from processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor_stage4
 from src.global_vars import init_logger
-
 from src.prompts import get_prompt
-from processor.gpu_processor import CodeProcessor, score_processor_stage4, llm_rewrite_processor
+from src.utils import (
+    extract_rewritten_code,
+    extract_scores_from_multiple_texts,
+)
 
 
 def stream_jsonl_(file_path: Path) -> Iterator[dict[str, Any]]:

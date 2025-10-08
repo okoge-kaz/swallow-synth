@@ -1,8 +1,7 @@
 import asyncio
-import time
-from typing import Dict, Any, Tuple, Iterator, AsyncIterator, Callable
 from itertools import count
-
+import time
+from typing import Any, AsyncIterator, Callable, Dict, Iterator, Tuple
 
 from transformers import AutoTokenizer
 
