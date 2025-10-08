@@ -157,7 +157,7 @@ def llm_rewrite_processor(
     *,
     tokenizer,
     max_model_len: int,
-    input_target_key: str, # adjust with partial
+    input_target_key: str,  # adjust with partial
     system_prompt: str = "",  # adjust with partial
     temperature: float = 0.0,  # adjust with partial
 ) -> Tuple[str, SamplingParams]:
