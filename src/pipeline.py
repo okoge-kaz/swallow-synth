@@ -8,7 +8,7 @@ import time
 from typing import Any, Iterator
 
 from processor.cpu_processor import auto_format, filter_by_content_length, filter_by_linter_errors
-from processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor_stage4
+from processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor
 from src.global_vars import init_logger, get_logger
 from src.prompts import get_prompt
 from src.utils import (
@@ -41,9 +41,11 @@ def llm_rewrite(
     tensor_parallel_size: int,
     model_max_length: int,
     prompt_type: str,
-    code_key: str,
+    input_target_key: str,
+    output_target_key: str,
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
+    logger = get_logger()
     processor = CodeProcessor(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
@@ -53,11 +55,10 @@ def llm_rewrite(
     total_items = 0
     start_time = time.perf_counter()
 
-    print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
-
+    logger.info(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
     system_prompt = get_prompt(prompt_type, lang)
 
-    rewrite_proc = partial(llm_rewrite_processor, value_key=code_key, system_prompt=system_prompt)
+    rewrite_proc = partial(llm_rewrite_processor, input_target_key=input_target_key, system_prompt=system_prompt)
 
     with output_path.open("w", encoding="utf-8") as fout:
 
@@ -70,8 +71,8 @@ def llm_rewrite(
                     item = ev["item"]
                     improved_text = ev["result"]
                     improved_code = extract_rewritten_code(improved_text, language=lang)
-                    item["improved_text"] = improved_text
-                    item["improved_code"] = improved_code
+                    item["rewrite_output"] = improved_text
+                    item[output_target_key] = improved_code
 
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
                     fout.flush()  # ensure truly streaming writes
@@ -82,7 +83,7 @@ def llm_rewrite(
         asyncio.run(_consume())
 
     actual_time = time.perf_counter() - start_time
-    print(f"LLM rewriting completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
+    logger.info(f"LLM rewriting completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
 def llm_scoring(
@@ -92,7 +93,7 @@ def llm_scoring(
     model_name: str,
     tensor_parallel_size: int,
     model_max_length: int,
-    code_key: str,
+    input_target_key: str,
 ) -> None:
     """LLM-based code quality scoring using GPU"""
     logger = get_logger()
@@ -105,9 +106,14 @@ def llm_scoring(
     total_items = 0
     start_time = time.perf_counter()
     logger.info(f"Starting LLM scoring with {tensor_parallel_size} GPUs...")
-    system_prompt = get_prompt("stage3", lang)
 
-    score_proc = partial(score_processor_stage4, value_key=code_key, system_prompt=system_prompt)
+    model_name = os.path.basename(model_name)
+    score_key = "score"
+    evaluation_key = f"{model_name}_evaluation"
+
+    system_prompt = get_prompt("stage4", lang)
+
+    score_proc = partial(score_processor, input_target_key=input_target_key, system_prompt=system_prompt)
 
     with output_path.open("w", encoding="utf-8") as fout:
 
@@ -212,8 +218,9 @@ if __name__ == "__main__":
                 model_name=args.model,
                 tensor_parallel_size=args.tensor_parallel_size,
                 model_max_length=args.model_max_length,
-                code_key=args.input_target_key,
+                input_target_key=args.input_target_key,
             )
+            # TODO: score filter implementation
         case 4:  # LLM rewriting
             llm_rewrite(
                 input_path=args.input_jsonl,
@@ -223,7 +230,8 @@ if __name__ == "__main__":
                 tensor_parallel_size=args.tensor_parallel_size,
                 model_max_length=args.model_max_length,
                 prompt_type=args.prompt_type,
-                code_key=args.input_target_key,
+                input_target_key=args.input_target_key,
+                output_target_key=args.output_target_key,
             )
         case 5:  # auto-format after LLM rewriting & filtering out with linter errors
             auto_format(
