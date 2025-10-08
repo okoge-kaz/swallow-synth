@@ -74,7 +74,7 @@ def process_chunk_to_file(args: tuple[list, Callable[[dict, str, str, Path], dic
     """Process a chunk of items and write to a separate file"""
     chunk, process_func, temp_dir, worker_id, input_target_key, output_target_key = args
     temp_file = temp_dir / f"worker_{worker_id}.jsonl"
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     with temp_file.open("w", encoding="utf-8") as fout:
         for item in chunk:
@@ -82,7 +82,7 @@ def process_chunk_to_file(args: tuple[list, Callable[[dict, str, str, Path], dic
             result = process_func(item, input_target_key, output_target_key, temp_dir)
             fout.write(json.dumps(result, ensure_ascii=False) + "\n")
 
-    processing_time = time.time() - start_time
+    processing_time = time.perf_counter() - start_time
 
     return {
         "temp_file": temp_file,

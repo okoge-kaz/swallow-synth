@@ -6,9 +6,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import uuid
 
 
-# === CPU Stage: Syntax check, fast format (ruff), lint (ruff) ===
-
-
 def syntax_check(code: str) -> Tuple[bool, List[Dict[str, Any]]]:
     try:
         ast.parse(code)

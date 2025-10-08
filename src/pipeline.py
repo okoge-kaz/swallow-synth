@@ -9,7 +9,7 @@ from typing import Any, Iterator
 
 from processor.cpu_processor import auto_format, filter_by_content_length, filter_by_linter_errors
 from processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor_stage4
-from src.global_vars import init_logger
+from src.global_vars import init_logger, get_logger
 from src.prompts import get_prompt
 from src.utils import (
     extract_rewritten_code,
@@ -51,7 +51,7 @@ def llm_rewrite(
     )
 
     total_items = 0
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     print(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
 
@@ -81,7 +81,7 @@ def llm_rewrite(
 
         asyncio.run(_consume())
 
-    actual_time = time.time() - start_time
+    actual_time = time.perf_counter() - start_time
     print(f"LLM rewriting completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
@@ -91,11 +91,11 @@ def llm_scoring(
     lang: str,
     model_name: str,
     tensor_parallel_size: int,
-    compare_model: bool = False,
-    model_max_length: int = 40960,
-    code_key: str = "text_formatted",
+    model_max_length: int,
+    code_key: str,
 ) -> None:
-    """LLM-based code quality scoring using GPU processing"""
+    """LLM-based code quality scoring using GPU"""
+    logger = get_logger()
     processor = CodeProcessor(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
@@ -103,9 +103,8 @@ def llm_scoring(
     )
 
     total_items = 0
-    start_time = time.time()
-
-    print(f"Starting LLM scoring with {tensor_parallel_size} GPUs...")
+    start_time = time.perf_counter()
+    logger.info(f"Starting LLM scoring with {tensor_parallel_size} GPUs...")
 
     model_name = os.path.basename(model_name)
     if compare_model:
@@ -137,8 +136,8 @@ def llm_scoring(
 
         asyncio.run(_consume())
 
-    actual_time = time.time() - start_time
-    print(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
+    actual_time = time.perf_counter() - start_time
+    logger.info(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
 def cpu_parse_args(subparser: argparse.ArgumentParser) -> None:
