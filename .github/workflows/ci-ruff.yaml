@@ -32,4 +32,4 @@ jobs:
 
       - name: Lint (ruff check)
         run: |
-          ruff check --config pyproject.toml --select E,F,I .
+          ruff check --config pyproject.toml .
