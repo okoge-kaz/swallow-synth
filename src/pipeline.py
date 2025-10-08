@@ -27,17 +27,6 @@ def get_process_item_cpu(lang: str) -> Callable:
     return processors[lang]
 
 
-def get_rewrite_pipeline(
-    lang: str, model_name: str, tensor_parallel_size: int = 1, model_max_length: int = 131072, use_async=False
-) -> RewritePipeline:
-    pipelines = {
-        "python": PythonRewritePipeline,
-    }
-    if lang not in pipelines:
-        raise ValueError(f"Unsupported language: {lang}")
-    return pipelines[lang](model_name, tensor_parallel_size, model_max_length, use_async)
-
-
 def process_chunk_to_file(args):
     """Process a chunk of items and write to a separate file"""
     chunk, process_func, temp_dir, worker_id, target_key = args
