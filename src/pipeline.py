@@ -2,13 +2,12 @@ import argparse
 import asyncio
 from functools import partial
 import json
-from multiprocessing import Pool, cpu_count
 import os
 from pathlib import Path
 import time
 from typing import Any, Iterator
 
-from processor.cpu_processor import auto_format, filter_by_content_length, process_file_filter
+from processor.cpu_processor import auto_format, filter_by_content_length, filter_by_linter_errors
 from processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor_stage4
 from src.global_vars import init_logger
 from src.prompts import get_prompt
@@ -142,80 +141,6 @@ def llm_scoring(
     print(f"LLM scoring completed: {actual_time:.1f}s total ({actual_time / total_items:.3f}s per item)")
 
 
-def after_rewrite_filter(
-    input_dir: Path,
-    output_dir: Path,
-    workers: int | None = None,
-) -> None:
-    """
-    Process all .jsonl files in input_dir and filter out data containing errors.
-    Each file is processed independently with multiprocessing support.
-    Items are filtered out if they have:
-    1. Linter errors, OR
-    2. text_formatted length < 10
-    Only clean items are saved to output-dir.
-    """
-    # Ensure output directory exists
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Find all .jsonl files in input directory
-    jsonl_files = list(input_dir.glob("*.jsonl"))
-    if not jsonl_files:
-        print(f"No .jsonl files found in {input_dir}")
-        return
-
-    print(f"Found {len(jsonl_files)} .jsonl files to process")
-
-    # Set default workers to CPU count if not specified
-    if workers is None:
-        workers = cpu_count()
-
-    # Limit workers to not exceed the number of files
-    workers = min(workers, len(jsonl_files))
-
-    print(f"Using {workers} workers for parallel processing")
-
-    # Prepare arguments for multiprocessing
-    args_list = [(file_path, output_dir) for file_path in jsonl_files]
-
-    # Process files in parallel
-    with Pool(workers) as pool:
-        results = pool.map(process_file_filter, args_list)
-
-    # Collect statistics from all filtered results
-    total_stats = {
-        "total_items": 0,
-        "linter_errors_count": 0,
-        "text_formatted_length_less_than_10": 0,
-        "total_filtered": 0,
-        "total_errors": 0,
-    }
-
-    for result in results:
-        print(f"  {result['file_name']}: {result['filtered_items']} clean items, {result['error_items']} filtered out")
-
-        # Accumulate statistics
-        for key in total_stats:
-            if key in result["stats"]:
-                total_stats[key] += result["stats"][key]
-
-        total_stats["total_filtered"] += result["filtered_items"]
-        total_stats["total_errors"] += result["error_items"]
-
-    # Print final statistics
-    print("After-rewrite filtering completed:")
-    print(f"  Total items processed: {total_stats['total_items']}")
-    print(f"  Clean items (saved): {total_stats['total_filtered']}")
-    print(f"  Items filtered out: {total_stats['total_errors']}")
-    print(
-        f"  Items with linter errors: {total_stats['linter_errors_count']} ({total_stats['linter_errors_count'] / total_stats['total_items'] * 100:.1f}%)"
-    )
-    print(
-        f"  Items with text_formatted length < 10: {total_stats['text_formatted_length_less_than_10']} ({total_stats['text_formatted_length_less_than_10'] / total_stats['total_items'] * 100:.1f}%)"
-    )
-    print(f"  Individual filtered files saved to: {output_dir}")
-
-
 def cpu_parse_args(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--num-cpu-workers", type=int, default=16, help="Number of CPU workers")
     subparser.add_argument("--read-batch-size", type=int, default=1024, help="Batch size for reading input JSONL")
@@ -269,7 +194,7 @@ if __name__ == "__main__":
 
     logger.info(f"Process stage: {args.process_stage} ({args.cmd})")
     match args.process_stage:
-        case 1:
+        case 1:  # auto-format
             auto_format(
                 input_path=args.input_jsonl,
                 output_path=args.output_jsonl,
@@ -280,7 +205,7 @@ if __name__ == "__main__":
                 batch_size=args.read_batch_size,
                 tmp_dir=args.tmp_dir,
             )
-        case 2:
+        case 2:  # filter by length for LLM scoring/rewrite and filtering out with linter errors
             filter_by_content_length(
                 input_path=args.input_jsonl,
                 output_path=args.output_jsonl,
@@ -289,7 +214,7 @@ if __name__ == "__main__":
                 threshold_character_length=args.filter_threshold_length,
                 save_longer_samples=True,
             )
-        case 3:
+        case 3:  # LLM scoring
             llm_scoring(
                 input_path=args.input_jsonl,
                 output_path=args.output_jsonl,
@@ -299,7 +224,7 @@ if __name__ == "__main__":
                 model_max_length=args.model_max_length,
                 code_key=args.input_target_key,
             )
-        case 4:
+        case 4:  # LLM rewriting
             llm_rewrite(
                 input_path=args.input_jsonl,
                 output_path=args.output_jsonl,
@@ -310,8 +235,22 @@ if __name__ == "__main__":
                 prompt_type=args.prompt_type,
                 code_key=args.input_target_key,
             )
-        case 5:
-            pass
+        case 5:  # auto-format after LLM rewriting & filtering out with linter errors
+            auto_format(
+                input_path=args.input_jsonl,
+                output_path=args.output_jsonl,
+                language=args.lang,
+                input_target_key=args.input_target_key,
+                output_target_key=args.output_target_key,
+                n_workers=args.num_cpu_workers,
+                batch_size=args.read_batch_size,
+                tmp_dir=args.tmp_dir,
+            )
+            filter_by_linter_errors(
+                input_path=args.output_jsonl,
+                output_path=args.output_jsonl,
+                input_target_key=args.output_target_key,
+            )
         case _:
             raise ValueError(f"Unsupported process stage: {args.process_stage}")
     logger.info("Processing completed.")

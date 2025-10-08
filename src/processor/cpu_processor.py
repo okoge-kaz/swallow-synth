@@ -91,6 +91,10 @@ def filter_by_content_length(
         for line in fin:
             item: dict[str, str] = json.loads(line)
             assert input_target_key in item, f"Key '{input_target_key}' not found in item: {item}"
+
+            if have_linter_errors(item=item):
+                continue
+
             text: str = item.get(input_target_key, "")
 
             if len(text) > threshold_character_length:
@@ -118,49 +122,36 @@ def filter_by_content_length(
     )
 
 
-def process_file_filter(args):
-    """Process a single file and filter out error-containing data"""
-    file_path, output_dir = args
+def filter_by_linter_errors(
+    input_path: Path,
+    output_path: Path,
+    input_target_key: str,
+) -> None:
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input file {input_path} does not exist")
 
-    filtered_items = []
-    file_stats = {"total_items": 0, "linter_errors_count": 0, "text_formatted_length_less_than_10": 0}
+    logger = get_logger()
+    logger.info(f"Filtering samples in '{input_target_key}' by linter errors")
 
-    print(f"Processing {file_path.name}...")
-
-    with file_path.open("r", encoding="utf-8") as fin:
+    valid_samples = []
+    error_samples = []
+    with input_path.open("r", encoding="utf-8") as fin:
         for line in fin:
-            item = json.loads(line)
-            file_stats["total_items"] += 1
+            item: dict[str, str] = json.loads(line)
+            assert input_target_key in item, f"Key '{input_target_key}' not found in item: {item}"
 
-            # Check for various error conditions
-            text_formatted = item.get("text_formatted", "")
+            if have_linter_errors(item=item):
+                error_samples.append(item)
+            else:
+                valid_samples.append(item)
 
-            # Check conditions
-            has_linter_errors = have_linter_errors(item)
-            text_formatted_long_enough = len(text_formatted) >= 10
+    valid_samples_path = output_path
 
-            # Count statistics
-            if has_linter_errors:
-                file_stats["linter_errors_count"] += 1
-            if not text_formatted_long_enough:
-                file_stats["text_formatted_length_less_than_10"] += 1
-
-            # Only keep items that pass all quality checks
-            if not has_linter_errors and text_formatted_long_enough:
-                filtered_items.append(item)
-
-    # Write filtered results for this file with train_ prefix
-    file_stem = file_path.stem
-    filtered_output_path = output_dir / f"{file_stem}.jsonl"
-
-    with filtered_output_path.open("w", encoding="utf-8") as fout:
-        for item in filtered_items:
+    with valid_samples_path.open("w", encoding="utf-8") as fout:
+        logger.info(f"Saving {len(valid_samples)} valid samples to {valid_samples_path}")
+        for item in valid_samples:
             fout.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-    return {
-        "file_name": file_path.name,
-        "filtered_items": len(filtered_items),
-        "error_items": file_stats["total_items"] - len(filtered_items),
-        "filtered_output_path": filtered_output_path,
-        "stats": file_stats,
-    }
+    logger.info(
+        f"Filtering by linter errors completed. Total samples: {len(valid_samples) + len(error_samples)}, samples with linter errors: {len(error_samples)}, valid samples: {len(valid_samples)}"
+    )
