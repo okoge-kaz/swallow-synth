@@ -155,7 +155,7 @@ def test_process_chunk_to_file_writes_and_reports(tmp_path: Path) -> None:
     assert temp_file.exists()
 
     with temp_file.open("r", encoding="utf-8") as f:
-        rows = [json.loads(l) for l in f]
+        rows = [json.loads(line) for line in f]
     assert rows == [
         {"id": 1, "input": "hello", "output": "HELLO"},
         {"id": 2, "input": "world", "output": "WORLD"},
