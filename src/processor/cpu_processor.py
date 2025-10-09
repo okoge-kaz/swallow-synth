@@ -155,3 +155,65 @@ def filter_by_linter_errors(
     logger.info(
         f"Filtering by linter errors completed. Total samples: {len(valid_samples) + len(error_samples)}, samples with linter errors: {len(error_samples)}, valid samples: {len(valid_samples)}"
     )
+
+
+def split_dataset_by_score(
+    input_path: Path,
+    output_path: Path,
+    input_target_key: str,
+    medium_score_threshold: int,
+    high_score_threshold: int,
+) -> None:
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input file {input_path} does not exist")
+
+    logger = get_logger()
+    logger.info(f"Splitting dataset by score thresholds: medium >= {medium_score_threshold}, high >= {high_score_threshold}")
+
+    low_score_samples = []
+    medium_score_samples = []
+    high_score_samples = []
+
+    with input_path.open("r", encoding="utf-8") as fin:
+        for line in fin:
+            item: dict[str, str] = json.loads(line)
+            assert input_target_key in item, f"Key '{input_target_key}' not found in item: {item}"
+
+            score = item.get("score", 0)
+            score = int(score)
+            if score >= high_score_threshold:
+                high_score_samples.append(item)
+            elif score >= medium_score_threshold:
+                medium_score_samples.append(item)
+            else:
+                low_score_samples.append(item)
+
+    output_dir = output_path.parent
+    os.makedirs(output_dir, exist_ok=True)
+
+    low_score_path = output_dir / "low" / output_path.name
+    medium_score_path = output_dir / "medium" / output_path.name
+    high_score_path = output_dir / "high" / output_path.name
+    os.makedirs(low_score_path.parent, exist_ok=True)
+    os.makedirs(medium_score_path.parent, exist_ok=True)
+    os.makedirs(high_score_path.parent, exist_ok=True)
+
+    with low_score_path.open("w", encoding="utf-8") as fout:
+        logger.info(f"Saving {len(low_score_samples)} low score samples to {low_score_path}")
+        for item in low_score_samples:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    with medium_score_path.open("w", encoding="utf-8") as fout:
+        logger.info(f"Saving {len(medium_score_samples)} medium score samples to {medium_score_path}")
+        for item in medium_score_samples:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    with high_score_path.open("w", encoding="utf-8") as fout:
+        logger.info(f"Saving {len(high_score_samples)} high score samples to {high_score_path}")
+        for item in high_score_samples:
+            fout.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+    logger.info(
+        f"Dataset splitting completed. Total samples: {len(low_score_samples) + len(medium_score_samples) + len(high_score_samples)}, "
+        f"low score samples: {len(low_score_samples)}, medium score samples: {len(medium_score_samples)}, high score samples: {len(high_score_samples)}"
+    )

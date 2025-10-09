@@ -8,10 +8,12 @@
 #PBS -v USE_SSH=1
 #PBS -koed
 #PBS -V
-#PBS -o outputs/pipeline/stage1_python
+#PBS -o outputs/python/stage1
 
 set -e
 cd $PBS_O_WORKDIR
+
+module load hpcx/2.20
 
 # environment variables
 export TMP="/groups/gag51395/fujii/tmp"
@@ -22,8 +24,8 @@ source .venv/bin/activate
 
 INDEX=8
 
-INPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/the-stack-v2/the-stack-v2/data/Python/train-0000$INDEX-of-00009.parquet/train-0000$INDEX-of-00009
-OUTPUT_FILE_DIR=/groups/gag51395/datasets/raw/pretrain/swallow-code-v2/stage1/python
+INPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/public/the-stack-v2/data/Python/train-0000$INDEX-of-00009.parquet/train-0000$INDEX-of-00009
+OUTPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/swallow/swallow-code-v2/stage1-auto-format/python
 
 for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
   echo "Processing $FILE"
@@ -51,10 +53,13 @@ for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
   echo "Output: $OUTPUT_FILE (INDEX=$INDEX, FILE_NUMBER=$FILE_NUMBER, FILE_INDEX=$FILE_INDEX)"
 
   export PYTHONPATH="$PWD:$PYTHONPATH"
-  mpirun --oversubscribe -np 1 python src/pipeline.py auto_format \
+  mpirun --oversubscribe -np 1 python src/pipeline.py cpu \
     --input-jsonl $FILE \
     --output-jsonl $OUTPUT_FILE \
-    --workers 16 \
+    --input-target-key text \
+    --output-target-key text \
+    --process-stage 1 \
+    --num-cpu-workers 16 \
     --lang python \
-    --batch-size 256
+    --read-batch-size 1024
 done

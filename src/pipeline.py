@@ -7,7 +7,7 @@ from pathlib import Path
 import time
 from typing import Any, Iterator
 
-from processor.cpu_processor import auto_format, filter_by_content_length, filter_by_linter_errors
+from processor.cpu_processor import auto_format, filter_by_content_length, filter_by_linter_errors, split_dataset_by_score
 from processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor
 from src.global_vars import get_logger, init_logger
 from src.prompts import get_prompt
@@ -154,7 +154,7 @@ def gpu_parse_args(subparser: argparse.ArgumentParser) -> None:
     )
     subparser.add_argument("--tensor-parallel-size", type=int, default=1, help="tensor parallel size for GPU tasks")
     subparser.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length")
-    subparser.add_argument("--prompt-type", type=str, default="stage5", choices=["stage5", "stage8"])
+    subparser.add_argument("--prompt-type", type=str, default="stage4", choices=["stage4", "stage6"])
 
 
 if __name__ == "__main__":
@@ -175,6 +175,8 @@ if __name__ == "__main__":
         help="Key to store formatted code (default: text_formatted)",
     )
     parser.add_argument("--process-stage", type=int, choices=range(1, 5), required=True)
+    parser.add_argument("--medium-score-threshold", type=int, default=4, help="Medium score threshold")
+    parser.add_argument("--high-score-threshold", type=int, default=7, help="High score threshold")
 
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -220,7 +222,13 @@ if __name__ == "__main__":
                 model_max_length=args.model_max_length,
                 input_target_key=args.input_target_key,
             )
-            # TODO: score filter implementation
+            split_dataset_by_score(
+                input_path=args.output_jsonl,
+                output_path=args.output_jsonl,
+                input_target_key=args.output_target_key,  # score
+                medium_score_threshold=args.medium_score_threshold,
+                high_score_threshold=args.high_score_threshold,
+            )
         case 4:  # LLM rewriting
             llm_rewrite(
                 input_path=args.input_jsonl,
