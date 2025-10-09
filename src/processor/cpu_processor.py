@@ -168,7 +168,9 @@ def split_dataset_by_score(
         raise FileNotFoundError(f"Input file {input_path} does not exist")
 
     logger = get_logger()
-    logger.info(f"Splitting dataset by score thresholds: medium >= {medium_score_threshold}, high >= {high_score_threshold}")
+    logger.info(
+        f"Splitting dataset by score thresholds: medium >= {medium_score_threshold}, high >= {high_score_threshold}"
+    )
 
     low_score_samples = []
     medium_score_samples = []
