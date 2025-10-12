@@ -56,7 +56,7 @@ def test_stream_jsonl_handles_final_partial_batch(tmp_path: Path) -> None:
     [
         # No marker, single code block
         ("before\n```python\nprint('ok')\n```\nafter", "python", "print('ok')"),
-        # Maker, single code block
+        # Marker, single code block
         (
             f"xxxx\n{REWRITTEN_CODE_MARKER}\nComment\n```python\nx=1\n```\n```python\nx=2\n```",
             "python",
