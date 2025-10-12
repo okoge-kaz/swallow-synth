@@ -56,7 +56,7 @@ def test_stream_jsonl_handles_final_partial_batch(tmp_path: Path) -> None:
     [
         # No marker, single code block
         ("before\n```python\nprint('ok')\n```\nafter", "python", "print('ok')"),
-        # Maker, single code block
+        # Marker, single code block
         (
             f"xxxx\n{REWRITTEN_CODE_MARKER}\nComment\n```python\nx=1\n```\n```python\nx=2\n```",
             "python",
@@ -129,7 +129,7 @@ def test_merge_temp_files_merges_and_deletes(tmp_path: Path) -> None:
 # process_chunk_to_file
 # -----------------------------
 def test_process_chunk_to_file_writes_and_reports(tmp_path: Path) -> None:
-    # dumpy processing function
+    # dummy processing function
     def dummy_process_func(item: Dict[str, Any], in_key: str, out_key: str, _tmp: Path) -> Dict[str, Any]:
         text = cast(str, item.get(in_key, ""))
         return {**item, out_key: text.upper()}
