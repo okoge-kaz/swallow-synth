@@ -1,15 +1,16 @@
 from importlib import import_module
 
+
 def get_prompt(stage: str, language: str = "python") -> str:
     """
     Dynamically load a prompt constant based on stage and language.
 
     Example:
-        get_prompt("stage4", "python") -> returns PYTHON_STAGE4_PROMPT
+        get_prompt("stage3", "python") -> returns PYTHON_STAGE3_PROMPT
         get_prompt("stage2", "finemath") -> returns FINEMATH_STAGE2_PROMPT
 
     Args:
-        stage: e.g. "stage2", "stage4", "stage5", "stage8"
+        stage: e.g. "stage3", "stage4", "stage6"
         language: e.g. "python", "finemath"
 
     Returns:
