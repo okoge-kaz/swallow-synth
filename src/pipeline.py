@@ -7,14 +7,14 @@ from pathlib import Path
 import time
 from typing import Any, Iterator
 
-from processor.cpu_processor import (
+from src.global_vars import get_logger, init_logger
+from src.processor.cpu_processor import (
     auto_format,
     filter_by_content_length,
     filter_by_linter_errors,
     split_dataset_by_score,
 )
-from processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor
-from src.global_vars import get_logger, init_logger
+from src.processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor
 from src.prompts import get_prompt
 from src.utils import (
     extract_rewritten_code,

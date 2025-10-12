@@ -1,0 +1,55 @@
+import json
+from pathlib import Path
+import sys
+import types
+
+import pytest
+
+
+stub_gpu = types.ModuleType("processor.gpu_processor")
+stub_gpu.CodeProcessor = object
+stub_gpu.llm_rewrite_processor = lambda *args, **kwargs: None
+stub_gpu.score_processor = lambda *args, **kwargs: None
+sys.modules.setdefault("processor.gpu_processor", stub_gpu)
+sys.modules.setdefault("src.processor.gpu_processor", stub_gpu)
+
+from src.pipeline import stream_jsonl_
+
+
+def write_lines(path: Path, lines: list[str]) -> None:
+    with path.open("w", encoding="utf-8") as fout:
+        fout.write("\n".join(lines))
+
+
+def test_stream_jsonl_ignores_blank_lines(tmp_path: Path) -> None:
+    file_path = tmp_path / "data.jsonl"
+    write_lines(
+        file_path,
+        [
+            "",
+            json.dumps({"a": 1}),
+            "  ",
+            json.dumps({"b": 2}),
+        ],
+    )
+
+    items = list(stream_jsonl_(file_path))
+    assert items == [{"a": 1}, {"b": 2}]
+
+
+def test_stream_jsonl_raises_on_invalid_json(tmp_path: Path) -> None:
+    file_path = tmp_path / "broken.jsonl"
+    write_lines(file_path, ["not json"])
+
+    with pytest.raises(ValueError) as exc:
+        list(stream_jsonl_(file_path))
+    assert "JSON parse error" in str(exc.value)
+
+
+def test_stream_jsonl_requires_object(tmp_path: Path) -> None:
+    file_path = tmp_path / "array.jsonl"
+    write_lines(file_path, [json.dumps([1, 2, 3])])
+
+    with pytest.raises(TypeError) as exc:
+        list(stream_jsonl_(file_path))
+    assert "Expected a JSON object" in str(exc.value)

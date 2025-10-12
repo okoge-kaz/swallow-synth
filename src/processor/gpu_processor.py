@@ -5,7 +5,7 @@ from typing import Any, AsyncIterator, Callable, Dict, Iterator, Tuple, cast
 
 from transformers import AutoTokenizer, PreTrainedTokenizer
 
-from utils import apply_chat_template
+from src.utils import apply_chat_template
 
 
 try:
