@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -q rt_HC
-#PBS -N stage1
+#PBS -N cpp_stage1
 #PBS -l select=1:ncpus=32
 #PBS -l walltime=72:00:00
 #PBS -j oe
@@ -8,7 +8,7 @@
 #PBS -v USE_SSH=1
 #PBS -koed
 #PBS -V
-#PBS -o outputs/c/stage1
+#PBS -o outputs/cpp/stage1
 
 set -e
 cd $PBS_O_WORKDIR
@@ -22,10 +22,10 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-INDEX=3
+INDEX=6
 
-INPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/public/the-stack-v2/data/C/train-0000$INDEX-of-00004.parquet/train-0000$INDEX-of-00004
-OUTPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/swallow/swallow-code-v2/stage1-auto-format/c
+INPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/public/the-stack-v2/data/C++/train-0000$INDEX-of-00007.parquet/train-0000$INDEX-of-00007
+OUTPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/swallow/swallow-code-v2/stage1-auto-format/cpp
 
 for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
   echo "Processing $FILE"
@@ -43,7 +43,7 @@ for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
     FILE_NUMBER=0
   fi
 
-  FILE_INDEX=$(($INDEX * 17 + $FILE_NUMBER))
+  FILE_INDEX=$(($INDEX * 19 + $FILE_NUMBER))
 
   OUTPUT_FILE=${OUTPUT_FILE_DIR}/train_$(printf "%04d" $FILE_INDEX).jsonl
   mkdir -p $(dirname $OUTPUT_FILE)
@@ -58,7 +58,7 @@ for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
     --input-target-key text \
     --output-target-key text \
     --process-stage 1 \
-    --lang c \
+    --lang cpp \
     cpu \
     --num-cpu-workers 16 \
     --read-batch-size 1024
