@@ -28,7 +28,6 @@ sys.modules.setdefault("processor.gpu_processor", stub_gpu)
 sys.modules.setdefault("src.processor.gpu_processor", stub_gpu)
 
 
-
 def write_lines(path: Path, lines: list[str]) -> None:
     with path.open("w", encoding="utf-8") as fout:
         fout.write("\n".join(lines))
