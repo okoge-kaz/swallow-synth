@@ -32,3 +32,21 @@ def test_get_prompt_missing_module(monkeypatch) -> None:
     with pytest.raises(ValueError) as exc:
         get_prompt("stage99", "python")
     assert "Prompt module not found" in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "language,stage,code_fence",
+    [
+        ("c", "stage4", "```c"),
+        ("cpp", "stage4", "```cpp"),
+        ("cuda", "stage4", "```cuda"),
+        ("go", "stage4", "```go"),
+        ("rust", "stage4", "```rust"),
+        ("javascript", "stage4", "```javascript"),
+        ("typescript", "stage4", "```typescript"),
+    ],
+)
+def test_get_prompt_real_languages(language: str, stage: str, code_fence: str) -> None:
+    prompt = get_prompt(stage, language)
+    assert "<|REWRITTEN_CODE|>:" in prompt
+    assert code_fence in prompt

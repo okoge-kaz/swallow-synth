@@ -28,6 +28,27 @@ def get_prompt(stage: str, language: str = "python") -> str:
         case "finemath":
             module_path = f"src.prompts.finemath.{stage}"
             const_name = f"FINEMATH_{stage.upper()}_PROMPT"
+        case "c":
+            module_path = f"src.prompts.c.{stage}"
+            const_name = f"C_{stage.upper()}_PROMPT"
+        case "cpp":
+            module_path = f"src.prompts.cpp.{stage}"
+            const_name = f"CPP_{stage.upper()}_PROMPT"
+        case "cuda":
+            module_path = f"src.prompts.cuda.{stage}"
+            const_name = f"CUDA_{stage.upper()}_PROMPT"
+        case "go":
+            module_path = f"src.prompts.go.{stage}"
+            const_name = f"GO_{stage.upper()}_PROMPT"
+        case "rust":
+            module_path = f"src.prompts.rust.{stage}"
+            const_name = f"RUST_{stage.upper()}_PROMPT"
+        case "javascript":
+            module_path = f"src.prompts.javascript.{stage}"
+            const_name = f"JAVASCRIPT_{stage.upper()}_PROMPT"
+        case "typescript":
+            module_path = f"src.prompts.typescript.{stage}"
+            const_name = f"TYPESCRIPT_{stage.upper()}_PROMPT"
         case _:
             raise ValueError(f"Unsupported language: {language}")
 

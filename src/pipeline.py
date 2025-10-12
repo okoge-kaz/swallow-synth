@@ -177,6 +177,15 @@ if __name__ == "__main__":
     logger = init_logger()
 
     parser = argparse.ArgumentParser(description="Code Quality Pipeline")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    # CPU subcommand
+    cpu_sub = sub.add_parser("cpu", help="CPU-based tasks")
+    cpu_parse_args(cpu_sub)
+
+    # GPU subcommand
+    gpu_sub = sub.add_parser("gpu", help="GPU-based tasks")
+    gpu_parse_args(gpu_sub)
 
     parser.add_argument("--input-jsonl", type=Path, help="Input JSONL file path", required=True)
     parser.add_argument("--output-jsonl", type=Path, help="Output JSONL file path", required=True)
@@ -193,16 +202,6 @@ if __name__ == "__main__":
     parser.add_argument("--process-stage", type=int, choices=range(1, 5), required=True)
     parser.add_argument("--medium-score-threshold", type=int, default=4, help="Medium score threshold")
     parser.add_argument("--high-score-threshold", type=int, default=7, help="High score threshold")
-
-    sub = parser.add_subparsers(dest="cmd", required=True)
-
-    # CPU subcommand
-    cpu_sub = sub.add_parser("cpu", help="CPU-based tasks")
-    cpu_parse_args(cpu_sub)
-
-    # GPU subcommand
-    gpu_sub = sub.add_parser("gpu", help="GPU-based tasks")
-    gpu_parse_args(gpu_sub)
 
     args = parser.parse_args()
 
