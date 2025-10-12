@@ -5,6 +5,8 @@ import types
 
 import pytest
 
+from src.pipeline import stream_jsonl_
+
 
 class _DummyProcessor:
     def __init__(self, *args, **kwargs) -> None:  # noqa: D401 - minimal stub
@@ -25,7 +27,6 @@ stub_gpu.score_processor = _dummy_processor_fn
 sys.modules.setdefault("processor.gpu_processor", stub_gpu)
 sys.modules.setdefault("src.processor.gpu_processor", stub_gpu)
 
-from src.pipeline import stream_jsonl_
 
 
 def write_lines(path: Path, lines: list[str]) -> None:
