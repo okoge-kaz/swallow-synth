@@ -50,4 +50,5 @@ mpirun --oversubscribe -np 1 python src/pipeline.py gpu \
   --model $MODEL_NAME \
   --tensor-parallel-size 1 \
   --model-max-length 40960 \
-  --prompt-type stage4
+  --prompt-type stage4 \
+  --gpu-backend vllm

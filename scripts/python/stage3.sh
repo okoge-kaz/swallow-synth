@@ -54,4 +54,5 @@ mpirun --oversubscribe -np 1 python src/pipeline.py gpu \
   --tensor-parallel-size 1 \
   --model-max-length 32768 \
   --medium-score-threshold 3 \
-  --high-score-threshold 7
+  --high-score-threshold 7 \
+  --gpu-backend tensorrt-llm

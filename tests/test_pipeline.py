@@ -6,10 +6,22 @@ import types
 import pytest
 
 
+class _DummyProcessor:
+    def __init__(self, *args, **kwargs) -> None:  # noqa: D401 - minimal stub
+        pass
+
+    async def process_code(self, *_args, **_kwargs):  # pragma: no cover - not used in these tests
+        yield {}
+
+
+def _dummy_processor_fn(*_args, **_kwargs):
+    return "", None
+
+
 stub_gpu = types.ModuleType("processor.gpu_processor")
-stub_gpu.CodeProcessor = object
-stub_gpu.llm_rewrite_processor = lambda *args, **kwargs: None
-stub_gpu.score_processor = lambda *args, **kwargs: None
+stub_gpu.CodeProcessor = _DummyProcessor
+stub_gpu.llm_rewrite_processor = _dummy_processor_fn
+stub_gpu.score_processor = _dummy_processor_fn
 sys.modules.setdefault("processor.gpu_processor", stub_gpu)
 sys.modules.setdefault("src.processor.gpu_processor", stub_gpu)
 

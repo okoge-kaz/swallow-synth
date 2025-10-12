@@ -48,6 +48,7 @@ def llm_rewrite(
     prompt_type: str,
     input_target_key: str,
     output_target_key: str,
+    backend: str,
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     logger = get_logger()
@@ -55,6 +56,7 @@ def llm_rewrite(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
         max_model_len=model_max_length,
+        backend=backend,
     )
 
     total_items = 0
@@ -99,6 +101,7 @@ def llm_scoring(
     tensor_parallel_size: int,
     model_max_length: int,
     input_target_key: str,
+    backend: str,
 ) -> None:
     """LLM-based code quality scoring using GPU"""
     logger = get_logger()
@@ -106,6 +109,7 @@ def llm_scoring(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
         max_model_len=model_max_length,
+        backend=backend,
     )
 
     total_items = 0
@@ -160,6 +164,13 @@ def gpu_parse_args(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--tensor-parallel-size", type=int, default=1, help="tensor parallel size for GPU tasks")
     subparser.add_argument("--model-max-length", type=int, default=40960, help="Maximum model length")
     subparser.add_argument("--prompt-type", type=str, default="stage4", choices=["stage4", "stage6"])
+    subparser.add_argument(
+        "--gpu-backend",
+        type=str,
+        default="vllm",
+        choices=["vllm", "tensorrt-llm"],
+        help="GPU backend implementation to use",
+    )
 
 
 if __name__ == "__main__":
@@ -226,6 +237,7 @@ if __name__ == "__main__":
                 tensor_parallel_size=args.tensor_parallel_size,
                 model_max_length=args.model_max_length,
                 input_target_key=args.input_target_key,
+                backend=args.gpu_backend,
             )
             split_dataset_by_score(
                 input_path=args.output_jsonl,
@@ -245,6 +257,7 @@ if __name__ == "__main__":
                 prompt_type=args.prompt_type,
                 input_target_key=args.input_target_key,
                 output_target_key=args.output_target_key,
+                backend=args.gpu_backend,
             )
         case 5:  # auto-format after LLM rewriting & filtering out with linter errors
             auto_format(
