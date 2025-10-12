@@ -1,4 +1,4 @@
-PYTHON_STAGE5_PROMPT = """
+PYTHON_STAGE4_PROMPT = """
 You are an expert coding. Please carefully rewrite the given code to be following the below rules:
 
 1. **Pythonic Style**: Ensure the code follows Python's PEP 8 style guide, including proper indentation, spacing, and naming conventions.
