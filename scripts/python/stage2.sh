@@ -36,8 +36,8 @@ MAX_INDEX=162
 for ((i=MIN_INDEX; i<=MAX_INDEX; i++)); do
   INDEX=$(printf "%04d" $i)
 
-  INPUT_FILE_PATH="$INPUT_DIR/train_${INDEX}.jsonl"
-  OUTPUT_FILE_PATH="$OUTPUT_DIR/train_${INDEX}.jsonl"
+  INPUT_FILE="$INPUT_DIR/train_${INDEX}.jsonl"
+  OUTPUT_FILE="$OUTPUT_DIR/train_${INDEX}.jsonl"
 
   if [ ! -f "$INPUT_FILE" ]; then
     echo "Input file not found: $INPUT_FILE"
