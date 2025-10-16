@@ -6,8 +6,29 @@ import tempfile
 from typing import Callable
 
 from src.global_vars import get_logger
+from src.languages.c import (
+    process_item_cpu as c_process_item_cpu,
+)
+from src.languages.cpp import (
+    process_item_cpu as cpp_process_item_cpu,
+)
+from src.languages.cuda import (
+    process_item_cpu as cuda_process_item_cpu,
+)
+from src.languages.go import (
+    process_item_cpu as go_process_item_cpu,
+)
+from src.languages.javascript import (
+    process_item_cpu as javascript_process_item_cpu,
+)
 from src.languages.python import (
     process_item_cpu as python_process_item_cpu,
+)
+from src.languages.rust import (
+    process_item_cpu as rust_process_item_cpu,
+)
+from src.languages.typescript import (
+    process_item_cpu as typescript_process_item_cpu,
 )
 from src.utils import (
     have_linter_errors,
@@ -21,6 +42,13 @@ from src.utils import (
 def get_process_item_cpu(language: str) -> Callable:
     processors = {
         "python": python_process_item_cpu,
+        "c": c_process_item_cpu,
+        "cpp": cpp_process_item_cpu,
+        "cuda": cuda_process_item_cpu,
+        "go": go_process_item_cpu,
+        "rust": rust_process_item_cpu,
+        "javascript": javascript_process_item_cpu,
+        "typescript": typescript_process_item_cpu,
     }
     if language not in processors:
         raise ValueError(f"Unsupported language: {language}")

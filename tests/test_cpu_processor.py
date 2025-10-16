@@ -28,9 +28,22 @@ def read_jsonl(path: Path) -> list[Dict[str, Any]]:
         return [json.loads(line) for line in fin]
 
 
-def test_get_process_item_cpu_known_language() -> None:
-    processor = cpu_processor.get_process_item_cpu("python")
-    assert processor is cpu_processor.python_process_item_cpu
+@pytest.mark.parametrize(
+    "language,expected",
+    [
+        ("python", cpu_processor.python_process_item_cpu),
+        ("c", cpu_processor.c_process_item_cpu),
+        ("cpp", cpu_processor.cpp_process_item_cpu),
+        ("cuda", cpu_processor.cuda_process_item_cpu),
+        ("go", cpu_processor.go_process_item_cpu),
+        ("rust", cpu_processor.rust_process_item_cpu),
+        ("javascript", cpu_processor.javascript_process_item_cpu),
+        ("typescript", cpu_processor.typescript_process_item_cpu),
+    ],
+)
+def test_get_process_item_cpu_known_language(language, expected) -> None:
+    processor = cpu_processor.get_process_item_cpu(language)
+    assert processor is expected
 
 
 def test_get_process_item_cpu_unknown_language() -> None:

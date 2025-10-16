@@ -2,7 +2,7 @@
 
 # Swallow-Code-v2
 
-### High-Quality Open Pre-training Code Corpus (Python)
+### High-Quality Open Pre-training Code Corpus (Python, C, C++, CUDA)
 
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -12,20 +12,28 @@
 
 ## Overview
 
-**Swallow-Code-v2** is a data processing pipeline that transforms raw Python source code from "The Stack v2" dataset into a high-quality, cleaned corpus suitable for pre-training large language models. The pipeline implements a multi-stage quality improvement workflow that combines automated formatting, LLM-based error correction, and quality scoring.
+**Swallow-Code-v2** is a data processing pipeline that transforms raw Python, C, C++, and CUDA source code from "The Stack v2" dataset into a high-quality, cleaned corpus suitable for pre-training large language models. The pipeline implements a multi-stage quality improvement workflow that combines automated formatting, LLM-based error correction, and quality scoring.
 
 ### Key Features
 
-- 🔧 **Automated Quality Improvement**: LLM-powered error fixing and code enhancement for Python
+- 🌐 **Multi-language Support**: Python, C, C++, and CUDA pipelines with language-specific tooling
+- 🔧 **Automated Quality Improvement**: LLM-powered error fixing and code enhancement
 - 📊 **Quality Scoring**: Comprehensive evaluation across readability, modularity, clarity, and reusability
 - ⚡ **HPC-Optimized**: Designed for large-scale processing on high-performance computing clusters
 - 🎯 **Educational Focus**: Produces well-documented, maintainable code examples
 
 ## Supported Languages
 
-| Language | Formatter | Linter | Status |
-|----------|-----------|--------|--------|
+| Language | Formatter | Linter / Check | Status |
+|----------|-----------|----------------|--------|
 | Python | Ruff | Ruff | ✅ Full Support |
+| C | clang-format | gcc -fsyntax-only | ✅ Full Support |
+| C++ | clang-format | g++ -fsyntax-only | ✅ Full Support |
+| CUDA C | clang-format | nvcc -c | ✅ Full Support |
+| Go | gofmt | go tool compile | ✅ Full Support |
+| Rust | rustfmt | rustc --emit metadata | ✅ Full Support |
+| JavaScript | prettier | node --check | ✅ Full Support |
+| TypeScript | prettier | tsc --noEmit | ✅ Full Support |
 
 ## Installation
 
