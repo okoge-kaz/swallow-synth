@@ -8,7 +8,7 @@
 #PBS -v USE_SSH=1
 #PBS -koed
 #PBS -V
-#PBS -o outputs/python/stage1
+#PBS -o outputs/python/stage5
 
 set -e
 cd $PBS_O_WORKDIR

@@ -95,10 +95,26 @@ class CodeProcessor:
             raise RuntimeError("This refactor is async-only. Provide a sync client if needed.")
 
         self.logger = get_logger()
+        self.logger.info(f"CodeProcessor: Loading model '{model_name}' with backend '{backend}'...")
         backend_module = load_backend(backend)
+        self.logger.info(f"CodeProcessor: Backend module '{backend}' loaded.")
+
         self.backend_name = backend
-        self.sampling_params_cls = backend_module.SamplingParams
-        self.llm = backend_module.AsyncLLMClient(
+
+        self.sampling_params_cls = None
+        if backend == "vllm":
+            from vllm import SamplingParams
+
+            self.sampling_params_cls = SamplingParams
+        elif backend == "tensorrt-llm":
+            from tensorrt_llm import SamplingParams
+
+            self.sampling_params_cls = SamplingParams
+        else:
+            raise ValueError(f"Unsupported backend: {backend}")
+
+        self.logger.info("CodeProcessor: llm client initializing...")
+        self.llm = backend_module.AsyncLLMClient(  # type: ignore
             model_name=model_name,
             tensor_parallel_size=tensor_parallel_size,
             max_model_len=max_model_len,
@@ -106,6 +122,7 @@ class CodeProcessor:
             gpu_memory_utilization=0.95,
             logger=self.logger,
         )
+        self.logger.info("CodeProcessor: llm client initialized.")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.tokenizer = cast(PreTrainedTokenizer, self.tokenizer)

@@ -1,19 +1,17 @@
-from importlib import import_module
-from types import ModuleType
+_BACKEND_MODULES = {"vllm", "tensorrt-llm"}
 
 
-_BACKEND_MODULES = {
-    "vllm": "src.processor.gpu_backends.vllm_backend",
-    "tensorrt-llm": "src.processor.gpu_backends.tensorrt_backend",
-}
-
-
-def load_backend(name: str) -> ModuleType:
+def load_backend(name: str):
     if name not in _BACKEND_MODULES:
         raise ValueError(f"Unsupported GPU backend: {name}")
 
-    module_path = _BACKEND_MODULES[name]
-    try:
-        return import_module(module_path)
-    except ModuleNotFoundError as exc:
-        raise ImportError(f"GPU backend '{name}' is not available: {exc}") from exc
+    if name == "vllm":
+        from src.processor.gpu_backends import vllm_backend
+
+        return vllm_backend
+    elif name == "tensorrt-llm":
+        from src.processor.gpu_backends import tensorrt_backend
+
+        return tensorrt_backend
+    else:
+        raise ValueError(f"Unsupported GPU backend: {name}")

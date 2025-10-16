@@ -52,12 +52,14 @@ def llm_rewrite(
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     logger = get_logger()
+    logger.info(f"llm_rewrite: Model loading: LLM model: {model_name}, backend: {backend}")
     processor = CodeProcessor(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
         max_model_len=model_max_length,
         backend=backend,
     )
+    logger.info(f"llm_rewrite: Model loaded: {model_name}")
 
     total_items = 0
     start_time = time.perf_counter()

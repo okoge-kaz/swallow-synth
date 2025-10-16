@@ -18,21 +18,22 @@ if [ -z "${INDEX:-}" ]; then
   exit 1
 fi
 
+INDEX=$(printf "%04d" $INDEX)
+
 module load cuda/12.8/12.8.1
-module load hpcx/2.20
+
+source .trt/bin/activate
 
 # environment variables
 export TMP="/groups/gag51395/fujii/tmp"
 export TMP_DIR="/groups/gag51395/fujii/tmp"
 export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
-source .venv/bin/activate
-
 QUALITY=medium
-MODEL_NAME=Qwen3-235B-A22B-Instruct-2507-FP8
+MODEL_NAME=openai/gpt-oss-20b
 
 DATASET_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/swallow/swallow-code-v2
-INPUT_FILE_PATH="$DATASET_DIR/stage3-llm-score/python/train_${INDEX}.jsonl"
+INPUT_FILE_PATH="$DATASET_DIR/stage3-llm-score/python/$QUALITY/train_${INDEX}.jsonl"
 OUTPUT_FILE_PATH="$DATASET_DIR/stage4-llm-rewrite/python/$QUALITY/train_${INDEX}.jsonl"
 mkdir -p $(dirname $OUTPUT_FILE_PATH)
 
@@ -40,11 +41,12 @@ export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="$PWD:$PYTHONPATH"
 
 export CUDA_VISIBLE_DEVICES="0"
-mpirun --oversubscribe -np 1 python src/pipeline.py \
+mpirun --oversubscribe -np 1 \
+  python src/pipeline.py \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_FILE_PATH \
   --lang python \
-  --input-target-key text \
+  --input-target-key text_formatted \
   --output-target-key text \
   --process-stage 4 \
   gpu \
@@ -52,4 +54,4 @@ mpirun --oversubscribe -np 1 python src/pipeline.py \
   --tensor-parallel-size 1 \
   --model-max-length 40960 \
   --prompt-type stage4 \
-  --gpu-backend vllm
+  --gpu-backend tensorrt-llm
