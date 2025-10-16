@@ -62,5 +62,6 @@ for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
     --lang python \
     cpu \
     --num-cpu-workers 16 \
-    --read-batch-size 1024
+    --read-batch-size 1024 \
+    --tmp-dir /local/$PBS_JOBID
 done

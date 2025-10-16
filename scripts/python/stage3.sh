@@ -43,13 +43,14 @@ export CUDA_VISIBLE_DEVICES=0
 export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="$PWD:$PYTHONPATH"
 
-mpirun --oversubscribe -np 1 python src/pipeline.py gpu \
+mpirun --oversubscribe -np 1 python src/pipeline.py \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_FILE_PATH \
   --lang python \
   --input-target-key text \
   --output-target-key score \
   --process-stage 3 \
+  gpu \
   --model $MODEL_PATH \
   --tensor-parallel-size 1 \
   --model-max-length 32768 \

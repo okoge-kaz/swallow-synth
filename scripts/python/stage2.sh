@@ -44,15 +44,16 @@ for ((i=MIN_INDEX; i<=MAX_INDEX; i++)); do
     continue
   fi
 
-  if mpirun --oversubscribe -np 1 python src/pipeline.py cpu \
+  if mpirun --oversubscribe -np 1 python src/pipeline.py \
       --input-jsonl $INPUT_FILE \
       --output-jsonl $OUTPUT_FILE \
       --input-target-key text \
       --output-target-key text \
       --process-stage 2 \
+      --lang python \
+      cpu \
       --filter-threshold-length 40960 \
       --num-cpu-workers 16 \
-      --lang python \
       --read-batch-size 4096; then
     echo "Successfully processed $INPUT_FILE"
   else

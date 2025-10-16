@@ -22,7 +22,7 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 source .venv/bin/activate
 
-INDEX=6
+INDEX=0
 
 INPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/public/the-stack-v2/data/C++/train-0000$INDEX-of-00007.parquet/train-0000$INDEX-of-00007
 OUTPUT_FILE_DIR=/groups/gch51639/fujii/datasets/raw/pretrain/swallow/swallow-code-v2/stage1-auto-format/cpp
@@ -61,5 +61,6 @@ for FILE in $(ls $INPUT_FILE_DIR/*.jsonl); do
     --lang cpp \
     cpu \
     --num-cpu-workers 16 \
-    --read-batch-size 1024
+    --read-batch-size 1024 \
+    --tmp-dir /local/$PBS_JOBID
 done

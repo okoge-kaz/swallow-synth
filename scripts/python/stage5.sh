@@ -35,13 +35,15 @@ for FILE_PATH in ${FILE_LIST[@]}; do
   OUTPUT_FILE_PATH="$OUTPUT_DIR/$FILE_NAME"
 
   echo "Processing $FILE_NAME ..."
-  mpirun --oversubscribe -np 1 python src/pipeline.py cpu \
+  mpirun --oversubscribe -np 1 python src/pipeline.py \
     --input-jsonl $FILE_PATH \
     --output-jsonl $OUTPUT_FILE_PATH \
     --lang python \
     --input-target-key text \
     --output-target-key text \
     --process-stage 5 \
+    cpu \
     --num-cpu-workers 32 \
-    --read-batch-size 4096
+    --read-batch-size 4096 \
+    --tmp-dir /local/$PBS_JOBID
 done
