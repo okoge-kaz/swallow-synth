@@ -38,6 +38,16 @@ mkdir -p $(dirname $OUTPUT_FILE_PATH)
 export TOKENIZERS_PARALLELISM="false"
 export PYTHONPATH="$PWD:$PYTHONPATH"
 
+# check
+if [ ! -f $INPUT_FILE_PATH ]; then
+  echo "Error: Input file $INPUT_FILE_PATH does not exist."
+  exit 1
+fi
+if [ -f $OUTPUT_FILE_PATH ]; then
+  echo "Error: Output file $OUTPUT_FILE_PATH already exists."
+  exit 1
+fi
+
 export CUDA_VISIBLE_DEVICES="0"
 python src/pipeline.py \
   --input-jsonl $INPUT_FILE_PATH \
