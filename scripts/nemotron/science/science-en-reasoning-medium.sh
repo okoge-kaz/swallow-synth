@@ -8,7 +8,7 @@
 #PBS -v USE_SSH=1
 #PBS -koed
 #PBS -V
-#PBS -o outputs/nemotron/math
+#PBS -o outputs/nemotron/science
 
 set -e
 cd $PBS_O_WORKDIR
@@ -30,7 +30,7 @@ REASONING_EFFORT="medium"
 # vLLM Log: Maximum concurrency for 32,768 tokens per request: 51.68x
 MAX_NUM_SEQS=50
 
-DATASET_DIR=/groups/gch51639/fujii/datasets/raw/instruct/public/Nemotron-Post-Training-Dataset-v1/math-jsonl/
+DATASET_DIR=/groups/gch51639/fujii/datasets/raw/instruct/swallow/Qwen3-Swallow-SFT/swallow-sft-reasoning/stem/
 INPUT_FILE_PATH="$DATASET_DIR/split/train_${INDEX}.jsonl"
 OUTPUT_FILE_PATH="$DATASET_DIR/gpt-oss-120b/$REASONING_EFFORT/train_${INDEX}.jsonl"
 mkdir -p $(dirname $OUTPUT_FILE_PATH)
@@ -43,7 +43,7 @@ python src/pipeline.py \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_FILE_PATH \
   --lang nemotron_post_training_v1 \
-  --input-target-key messages \
+  --input-target-key conversation \
   --output-target-key conversation \
   --process-stage 4 \
   gpu \

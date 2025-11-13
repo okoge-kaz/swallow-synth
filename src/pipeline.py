@@ -108,7 +108,8 @@ def llm_rewrite(
                             "thinking": reasoning_content,  # gpt-oss
                         },
                     ]
-                    item.pop(input_target_key)
+                    if input_target_key != output_target_key:
+                        item.pop(input_target_key)
 
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
                     fout.flush()  # ensure truly streaming writes
@@ -131,6 +132,7 @@ def llm_scoring(
     model_max_length: int,
     input_target_key: str,
     backend: str,
+    max_num_seqs: int,
 ) -> None:
     """LLM-based code quality scoring using GPU"""
     logger = get_logger()
@@ -139,6 +141,7 @@ def llm_scoring(
         tensor_parallel_size=tensor_parallel_size,
         max_model_len=model_max_length,
         backend=backend,
+        max_num_seqs=max_num_seqs,
     )
 
     total_items = 0
@@ -278,6 +281,7 @@ if __name__ == "__main__":
                 model_max_length=args.model_max_length,
                 input_target_key=args.input_target_key,
                 backend=args.gpu_backend,
+                max_num_seqs=args.max_num_seqs,
             )
             split_dataset_by_score(
                 input_path=args.output_jsonl,

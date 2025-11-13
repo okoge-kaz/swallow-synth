@@ -27,7 +27,7 @@ export HF_HOME="/groups/gag51395/fujii/hf_cache"
 
 MODEL_NAME=openai/gpt-oss-120b
 REASONING_EFFORT="medium"
-# vLLM Log: Maximum concurrency for 65,536 tokens per request: 26.80x
+# vLLM Log: Maximum concurrency for 32,768 tokens per request: 51.68x
 MAX_NUM_SEQS=50
 
 DATASET_DIR=/groups/gch51639/fujii/datasets/raw/instruct/public/Nemotron-Post-Training-Dataset-v1/code-jsonl/
