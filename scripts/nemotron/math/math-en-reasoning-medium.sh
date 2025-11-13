@@ -8,7 +8,7 @@
 #PBS -v USE_SSH=1
 #PBS -koed
 #PBS -V
-#PBS -o outputs/nemotron/code
+#PBS -o outputs/nemotron/math
 
 set -e
 cd $PBS_O_WORKDIR
@@ -30,7 +30,7 @@ REASONING_EFFORT="medium"
 # vLLM Log: Maximum concurrency for 65,536 tokens per request: 26.80x
 MAX_NUM_SEQS=50
 
-DATASET_DIR=/groups/gch51639/fujii/datasets/raw/instruct/public/Nemotron-Post-Training-Dataset-v1/code-jsonl/
+DATASET_DIR=/groups/gch51639/fujii/datasets/raw/instruct/public/Nemotron-Post-Training-Dataset-v1/math-jsonl/
 INPUT_FILE_PATH="$DATASET_DIR/split/train_${INDEX}.jsonl"
 OUTPUT_FILE_PATH="$DATASET_DIR/gpt-oss-120b/$REASONING_EFFORT/train_${INDEX}.jsonl"
 mkdir -p $(dirname $OUTPUT_FILE_PATH)
