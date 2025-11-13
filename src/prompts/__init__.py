@@ -49,6 +49,9 @@ def get_prompt(stage: str, language: str = "python") -> str:
         case "typescript":
             module_path = f"src.prompts.typescript.{stage}"
             const_name = f"TYPESCRIPT_{stage.upper()}_PROMPT"
+        case "nemotron_post_training_v1":
+            module_path = f"src.prompts.nemotron_post_training_v1.{stage}"
+            const_name = f"NEMOTRON_POST_TRAINING_V1_{stage.upper()}_PROMPT"
         case _:
             raise ValueError(f"Unsupported language: {language}")
 

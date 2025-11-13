@@ -7,6 +7,8 @@ from pathlib import Path
 import time
 from typing import Any, Iterator
 
+from sympy import EX
+
 from src.global_vars import get_logger, init_logger
 from src.processor.cpu_processor import (
     auto_format,
@@ -14,10 +16,10 @@ from src.processor.cpu_processor import (
     filter_by_linter_errors,
     split_dataset_by_score,
 )
-from src.processor.gpu_processor import CodeProcessor, llm_rewrite_processor, score_processor
+from src.processor.gpu_processor import Processor, llm_rewrite_processor, score_processor
 from src.prompts import get_prompt
 from src.utils import (
-    extract_rewritten_code,
+    extract,
     extract_scores_from_multiple_texts,
 )
 
@@ -49,15 +51,18 @@ def llm_rewrite(
     input_target_key: str,
     output_target_key: str,
     backend: str,
+    reasoning_effort: str = "high",
+    max_num_seqs: int = 20,
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     logger = get_logger()
     logger.info(f"llm_rewrite: Model loading: LLM model: {model_name}, backend: {backend}")
-    processor = CodeProcessor(
+    processor = Processor(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
         max_model_len=model_max_length,
         backend=backend,
+        max_num_seqs=max_num_seqs,
     )
     logger.info(f"llm_rewrite: Model loaded: {model_name}")
 
@@ -67,7 +72,12 @@ def llm_rewrite(
     logger.info(f"Starting LLM rewriting with {tensor_parallel_size} GPUs using {prompt_type} prompt...")
     system_prompt = get_prompt(prompt_type, lang)
 
-    rewrite_proc = partial(llm_rewrite_processor, input_target_key=input_target_key, system_prompt=system_prompt)
+    rewrite_proc = partial(
+        llm_rewrite_processor,
+        input_target_key=input_target_key,
+        system_prompt=system_prompt,
+        reasoning_effort=reasoning_effort,
+    )
 
     with output_path.open("w", encoding="utf-8") as fout:
 
@@ -78,10 +88,27 @@ def llm_rewrite(
             ):
                 if "error" not in ev:
                     item = ev["item"]
-                    improved_text = ev["result"]
-                    improved_code = extract_rewritten_code(improved_text, language=lang)
-                    item["rewrite_output"] = improved_text
-                    item[output_target_key] = improved_code
+                    output_text = ev["result"]
+                    item["output"] = output_text
+                    item["generator"] = "gpt-oss-120b"
+
+                    user_turn: dict = item[input_target_key][0]
+                    try:
+                        assistant_output, reasoning_content = extract(output_text)
+                    except Exception:
+                        assistant_output = ""
+                        reasoning_content = ""
+
+                    item[output_target_key] = [
+                        user_turn,
+                        {
+                            "role": "assistant",
+                            "content": assistant_output,
+                            "reasoning_content": reasoning_content,  # qwen3
+                            "thinking": reasoning_content,  # gpt-oss
+                        },
+                    ]
+                    item.pop(input_target_key)
 
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
                     fout.flush()  # ensure truly streaming writes
@@ -107,7 +134,7 @@ def llm_scoring(
 ) -> None:
     """LLM-based code quality scoring using GPU"""
     logger = get_logger()
-    processor = CodeProcessor(
+    processor = Processor(
         model_name=model_name,
         tensor_parallel_size=tensor_parallel_size,
         max_model_len=model_max_length,
@@ -172,6 +199,18 @@ def gpu_parse_args(subparser: argparse.ArgumentParser) -> None:
         default="vllm",
         choices=["vllm", "tensorrt-llm"],
         help="GPU backend implementation to use",
+    )
+    subparser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        default="high",
+        choices=["low", "medium", "high"],
+        help="Level of reasoning effort for LLM rewriting",
+    )
+    subparser.add_argument(
+        "--max-num-seqs",
+        type=int,
+        help="Maximum number of sequences to process in parallel on GPU",
     )
 
 
@@ -259,6 +298,8 @@ if __name__ == "__main__":
                 input_target_key=args.input_target_key,
                 output_target_key=args.output_target_key,
                 backend=args.gpu_backend,
+                reasoning_effort=args.reasoning_effort,
+                max_num_seqs=args.max_num_seqs,
             )
         case 5:  # auto-format after LLM rewriting & filtering out with linter errors
             auto_format(

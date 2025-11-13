@@ -23,6 +23,27 @@ def stream_jsonl(file_path: Path, batch_size: int = 1024) -> Iterator[list[dict[
             yield batch
 
 
+def extract(text: str):
+    import re
+
+    pat = re.compile(
+        r"<\|channel\|>analysis<\|message\|>(?P<reasoning>.*?)<\|end\|>\s*"
+        r"<\|start\|>assistant<\|channel\|>final\s*"
+        r"<\|message\|>\s*(?P<final>.*)",
+        re.DOTALL,
+    )
+
+    m = pat.search(text)
+    assert m, "タグ列（analysis→end→final→message）が見つかりません"
+
+    reasoning_content = m.group("reasoning").strip()
+    assistant_output = m.group("final").strip()
+
+    assert reasoning_content != "", "reasoning_content が空です"
+
+    return assistant_output, reasoning_content
+
+
 def extract_rewritten_code(text: str, language: str) -> str:
     start_index = text.find(REWRITTEN_CODE_MARKER)
     if start_index == -1:
@@ -121,6 +142,7 @@ def apply_chat_template(
     tokenizer: PreTrainedTokenizer,
     system_prompt: str,
     user_input: str,
+    reasoning_effort: str = "medium",
 ) -> str:
     prompt = tokenizer.apply_chat_template(
         conversation=[
@@ -129,5 +151,6 @@ def apply_chat_template(
         ],
         tokenize=False,
         add_generation_prompt=True,
+        reasoning_effort=reasoning_effort,
     )
     return cast(str, prompt)

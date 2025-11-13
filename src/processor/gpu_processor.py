@@ -23,6 +23,7 @@ def llm_rewrite_processor(
     input_target_key: str,
     system_prompt: str = "",
     temperature: float = 0.0,
+    reasoning_effort: str = "medium",
     sampling_params_cls: type | None = None,
 ) -> Tuple[str, SamplingParamsType]:
     if sampling_params_cls is None:
@@ -31,11 +32,19 @@ def llm_rewrite_processor(
     if input_target_key not in item:
         raise KeyError(f"Item missing required key '{input_target_key}'.")
 
-    if system_prompt == "":
-        raise ValueError("system_prompt is empty, use functools.partial to set a system prompt")
+    conversation = item.get(input_target_key, "")
+    assert isinstance(conversation, list)
+    user_turn = conversation[0]
+    assert isinstance(user_turn, dict)
+    assert user_turn.get("role") == "user"
+    content: str = user_turn.get("content", "")
 
-    code: str = item.get(input_target_key, "")
-    prompt = apply_chat_template(tokenizer=tokenizer, system_prompt=system_prompt, user_input=code)
+    prompt = apply_chat_template(
+        tokenizer=tokenizer,
+        system_prompt=system_prompt,
+        user_input=content,
+        reasoning_effort=reasoning_effort,
+    )
 
     used = len(tokenizer.encode(prompt))
     if used >= max_model_len:
@@ -45,7 +54,7 @@ def llm_rewrite_processor(
         )
     max_tokens = max(1, max_model_len - used)
 
-    sp = sampling_params_cls(temperature=temperature, max_tokens=max_tokens)
+    sp = sampling_params_cls(temperature=temperature, max_tokens=max_tokens, skip_special_tokens=False)
     return prompt, sp
 
 
@@ -81,7 +90,7 @@ def score_processor(
     return prompt, sp
 
 
-class CodeProcessor:
+class Processor:
     def __init__(
         self,
         model_name: str,
@@ -89,15 +98,16 @@ class CodeProcessor:
         max_model_len: int,
         *,
         backend: str,
+        max_num_seqs: int,
         use_async: bool = True,
     ) -> None:
         if not use_async:
             raise RuntimeError("This refactor is async-only. Provide a sync client if needed.")
 
         self.logger = get_logger()
-        self.logger.info(f"CodeProcessor: Loading model '{model_name}' with backend '{backend}'...")
+        self.logger.info(f"Processor: Loading model '{model_name}' with backend '{backend}'...")
         backend_module = load_backend(backend)
-        self.logger.info(f"CodeProcessor: Backend module '{backend}' loaded.")
+        self.logger.info(f"Processor: Backend module '{backend}' loaded.")
 
         self.backend_name = backend
 
@@ -113,16 +123,16 @@ class CodeProcessor:
         else:
             raise ValueError(f"Unsupported backend: {backend}")
 
-        self.logger.info("CodeProcessor: llm client initializing...")
+        self.logger.info("Processor: llm client initializing...")
         self.llm = backend_module.AsyncLLMClient(  # type: ignore
             model_name=model_name,
             tensor_parallel_size=tensor_parallel_size,
             max_model_len=max_model_len,
-            max_num_seqs=512,
-            gpu_memory_utilization=0.95,
+            max_num_seqs=max_num_seqs,
+            gpu_memory_utilization=0.92,
             logger=self.logger,
         )
-        self.logger.info("CodeProcessor: llm client initialized.")
+        self.logger.info("Processor: llm client initialized.")
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.tokenizer = cast(PreTrainedTokenizer, self.tokenizer)
@@ -178,7 +188,7 @@ class CodeProcessor:
                     yield {"item": item, "result": result}
                 except Exception as e:  # pragma: no cover - defensive logging
                     self.logger.info(f"[task-error] {e!r}")
-                    yield {"error": f"[swallow-code] [task-error] {e!r}"}
+                    yield {"error": f"[swallow-synth] [task-error] {e!r}"}
 
                 try:
                     itm = next(code_iterator)
