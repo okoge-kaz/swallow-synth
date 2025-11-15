@@ -9,10 +9,10 @@ do
     echo "Skipping INDEX ${FORMATTED_INDEX} as output file already exists."
     continue
   fi
-  qsub -P gag51395 -v INDEX=$INDEX scripts/nemotron/code/code-en-reasoning-medium.sh
+  qsub -P gch51639 -q R9920251300 -v RTYPE=rt_HG,INDEX=$INDEX scripts/nemotron/code/code-en-reasoning-medium.sh
 done
 
-# math
+# # math
 for INDEX in {0..681}
 do
   OUTPUT_DIR=/groups/gch51639/fujii/datasets/raw/instruct/public/Nemotron-Post-Training-Dataset-v1/math-jsonl/gpt-oss-120b/medium/
@@ -21,7 +21,7 @@ do
     echo "Skipping INDEX ${FORMATTED_INDEX} as output file already exists."
     continue
   fi
-  qsub -P gag51395 -v INDEX=$INDEX scripts/nemotron/math/math-en-reasoning-medium.sh
+  qsub -P gch51639 -q R9920251300 -v RTYPE=rt_HG,INDEX=$INDEX scripts/nemotron/math/math-en-reasoning-medium.sh
 done
 
 # stem
@@ -33,5 +33,5 @@ do
     echo "Skipping INDEX ${FORMATTED_INDEX} as output file already exists."
     continue
   fi
-  qsub -P gag51395 -v INDEX=$INDEX scripts/nemotron/science/science-en-reasoning-medium.sh
+  qsub -P gch51639 -q R9920251300 -v RTYPE=rt_HG,INDEX=$INDEX scripts/nemotron/science/science-en-reasoning-medium.sh
 done
