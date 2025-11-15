@@ -90,24 +90,17 @@ def llm_rewrite(
                     item["output"] = output_text
                     item["generator"] = "gpt-oss-120b"
 
-                    user_turn: dict = item[input_target_key][0]
                     try:
-                        assistant_output, reasoning_content = extract(output_text)
+                        assistant_output, _ = extract(output_text)
                     except Exception:
                         assistant_output = ""
-                        reasoning_content = ""
 
                     item[output_target_key] = [
-                        user_turn,
                         {
-                            "role": "assistant",
+                            "role": "user",
                             "content": assistant_output,
-                            "reasoning_content": reasoning_content,  # qwen3
-                            "thinking": reasoning_content,  # gpt-oss
                         },
                     ]
-                    if input_target_key != output_target_key:
-                        item.pop(input_target_key)
 
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
                     fout.flush()  # ensure truly streaming writes
