@@ -50,7 +50,7 @@ export CUDA_VISIBLE_DEVICES="0"
 python src/pipeline.py \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_FILE_PATH \
-  --lang translate \
+  --lang translate_science \
   --input-target-key english_conversation \
   --output-target-key conversation \
   --process-stage 4 \
