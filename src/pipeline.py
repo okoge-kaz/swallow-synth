@@ -7,8 +7,6 @@ from pathlib import Path
 import time
 from typing import Any, Iterator
 
-from sympy import EX
-
 from src.global_vars import get_logger, init_logger
 from src.processor.cpu_processor import (
     auto_format,
