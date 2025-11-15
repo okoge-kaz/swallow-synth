@@ -55,6 +55,9 @@ def get_prompt(stage: str, language: str = "python") -> str:
         case "translate":
             module_path = f"src.prompts.translate.{stage}"
             const_name = f"TRANSLATE_{stage.upper()}_PROMPT"
+        case "translate_code":
+            module_path = f"src.prompts.translate_code.{stage}"
+            const_name = f"TRANSLATE_CODE_{stage.upper()}_PROMPT"
         case _:
             raise ValueError(f"Unsupported language: {language}")
 
