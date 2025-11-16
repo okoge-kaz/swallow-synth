@@ -61,4 +61,5 @@ python src/pipeline.py \
   --prompt-type stage4 \
   --gpu-backend vllm \
   --reasoning-effort $REASONING_EFFORT \
-  --max-num-seqs $MAX_NUM_SEQS
+  --max-num-seqs $MAX_NUM_SEQS \
+  --translate-mode

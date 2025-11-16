@@ -51,6 +51,7 @@ def llm_rewrite(
     backend: str,
     reasoning_effort: str = "high",
     max_num_seqs: int = 20,
+    translate_mode: bool = False,
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     logger = get_logger()
@@ -90,17 +91,32 @@ def llm_rewrite(
                     item["output"] = output_text
                     item["generator"] = "gpt-oss-120b"
 
+                    user_turn: dict[str, str] = item[input_target_key][0]
                     try:
-                        assistant_output, _ = extract(output_text)
+                        assistant_output, thinking_content = extract(output_text)
                     except Exception:
                         assistant_output = ""
+                        thinking_content = ""
 
-                    item[output_target_key] = [
-                        {
-                            "role": "user",
-                            "content": assistant_output,
-                        },
-                    ]
+                    if translate_mode:
+                        item[output_target_key] = [
+                            {
+                                "role": "user",
+                                "content": assistant_output,
+                            },
+                        ]
+                    else:
+                        item[output_target_key] = [
+                            user_turn,
+                            {
+                                "role": "assistant",
+                                "content": assistant_output,
+                                "reasoning_content": thinking_content,
+                                "thinking": thinking_content,
+                            },
+                        ]
+                        if input_target_key != output_target_key:
+                            item.pop(input_target_key)
 
                     fout.write(json.dumps(item, ensure_ascii=False) + "\n")
                     fout.flush()  # ensure truly streaming writes
@@ -206,6 +222,11 @@ def gpu_parse_args(subparser: argparse.ArgumentParser) -> None:
         type=int,
         help="Maximum number of sequences to process in parallel on GPU",
     )
+    subparser.add_argument(
+        "--translate-mode",
+        action="store_true",
+        help="Whether to run in translation mode",
+    )
 
 
 if __name__ == "__main__":
@@ -295,6 +316,7 @@ if __name__ == "__main__":
                 backend=args.gpu_backend,
                 reasoning_effort=args.reasoning_effort,
                 max_num_seqs=args.max_num_seqs,
+                translate_mode=args.translate_mode,
             )
         case 5:  # auto-format after LLM rewriting & filtering out with linter errors
             auto_format(
