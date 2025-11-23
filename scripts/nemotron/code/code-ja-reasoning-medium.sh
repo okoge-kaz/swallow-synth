@@ -36,7 +36,7 @@ MAX_NUM_SEQS=50
 
 DATASET_DIR=/groups/gch51639/fujii/datasets/raw/instruct/swallow/Qwen3-Swallow-SFT/nemotron-post-training-v1-ja/code/
 INPUT_FILE_PATH="$DATASET_DIR/split/train_${INDEX}.jsonl"
-OUTPUT_FILE_PATH="$DATASET_DIR/gpt-oss-120b/$REASONING_EFFORT/train_${INDEX}.jsonl"
+OUTPUT_FILE_PATH="$DATASET_DIR/gpt-oss-120b/$REASONING_EFFORT/train_ja_${INDEX}.jsonl"
 mkdir -p $(dirname $OUTPUT_FILE_PATH)
 
 export TOKENIZERS_PARALLELISM="false"
@@ -56,7 +56,7 @@ export CUDA_VISIBLE_DEVICES="0"
 python src/pipeline.py \
   --input-jsonl $INPUT_FILE_PATH \
   --output-jsonl $OUTPUT_FILE_PATH \
-  --lang nemotron_post_training_v1 \
+  --lang nemotron_post_training_v1_ja \
   --input-target-key conversation \
   --output-target-key conversation \
   --process-stage 4 \

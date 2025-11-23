@@ -52,6 +52,9 @@ def get_prompt(stage: str, language: str = "python") -> str:
         case "nemotron_post_training_v1":
             module_path = f"src.prompts.nemotron_post_training_v1.{stage}"
             const_name = f"NEMOTRON_POST_TRAINING_V1_{stage.upper()}_PROMPT"
+        case "nemotron_post_training_v1_ja":
+            module_path = f"src.prompts.nemotron_post_training_v1_ja.{stage}"
+            const_name = f"NEMOTRON_POST_TRAINING_V1_JA_{stage.upper()}_PROMPT"
         case "translate":
             module_path = f"src.prompts.translate.{stage}"
             const_name = f"TRANSLATE_{stage.upper()}_PROMPT"

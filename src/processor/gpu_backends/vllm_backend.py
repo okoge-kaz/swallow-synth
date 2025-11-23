@@ -28,7 +28,7 @@ class AsyncLLMClient:
             max_num_seqs=max_num_seqs,
             task="generate",
             enable_prefix_caching=True,
-            enforce_eager=True,
+            enforce_eager=False,
             async_scheduling=True,
             enable_chunked_prefill=True,
             tensor_parallel_size=tensor_parallel_size,
