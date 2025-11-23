@@ -34,6 +34,7 @@ class AsyncLLMClient:
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             max_model_len=max_model_len,
+            # compilation_config=
         )
         self.engine = AsyncLLM.from_engine_args(engine_args)
 

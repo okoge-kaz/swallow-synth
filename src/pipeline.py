@@ -52,6 +52,7 @@ def llm_rewrite(
     reasoning_effort: str = "high",
     max_num_seqs: int = 20,
     translate_mode: bool = False,
+    medical_data: bool = False,
 ) -> None:
     """LLM-based code rewriting using GPU processing"""
     logger = get_logger()
@@ -76,6 +77,7 @@ def llm_rewrite(
         input_target_key=input_target_key,
         system_prompt=system_prompt,
         reasoning_effort=reasoning_effort,
+        medical_data=medical_data,
     )
 
     with output_path.open("w", encoding="utf-8") as fout:
@@ -227,6 +229,11 @@ def gpu_parse_args(subparser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Whether to run in translation mode",
     )
+    subparser.add_argument(
+        "--medical-data",
+        action="store_true",
+        help="Whether the data is medical-related",
+    )
 
 
 if __name__ == "__main__":
@@ -317,6 +324,7 @@ if __name__ == "__main__":
                 reasoning_effort=args.reasoning_effort,
                 max_num_seqs=args.max_num_seqs,
                 translate_mode=args.translate_mode,
+                medical_data=args.medical_data,
             )
         case 5:  # auto-format after LLM rewriting & filtering out with linter errors
             auto_format(

@@ -25,6 +25,7 @@ def llm_rewrite_processor(
     temperature: float = 0.0,
     reasoning_effort: str = "medium",
     sampling_params_cls: type | None = None,
+    medical_data: bool = False,
 ) -> Tuple[str, SamplingParamsType]:
     if sampling_params_cls is None:
         raise ValueError("sampling_params_cls must be provided for llm_rewrite_processor")
@@ -32,12 +33,15 @@ def llm_rewrite_processor(
     if input_target_key not in item:
         raise KeyError(f"Item missing required key '{input_target_key}'.")
 
-    conversation = item.get(input_target_key, "")
-    assert isinstance(conversation, list)
-    user_turn = conversation[0]
-    assert isinstance(user_turn, dict)
-    assert user_turn.get("role") == "user"
-    content: str = user_turn.get("content", "")
+    if not medical_data:
+        conversation = item.get(input_target_key, "")
+        assert isinstance(conversation, list)
+        user_turn = conversation[0]
+        assert isinstance(user_turn, dict)
+        assert user_turn.get("role") == "user"
+        content: str = user_turn.get("content", "")
+    else:
+        content = item[input_target_key]
 
     prompt = apply_chat_template(
         tokenizer=tokenizer,
